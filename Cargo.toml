@@ -5,6 +5,8 @@ authors = ["Matthew J. Berger <matthewberger@nevada.unr.edu>"]
 edition = "2018"
 
 [dependencies]
+winit = "0.21"
+nalgebra-glm = "0.7.0"
 
 [lib]
 name = "support"
