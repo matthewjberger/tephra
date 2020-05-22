@@ -1,5 +1,6 @@
 use nalgebra_glm as glm;
-use std::time::Instant;
+use std::{time::Instant, sync::Arc};
+use ash::vk;
 use winit::{
     dpi::PhysicalSize,
     event::{
@@ -7,13 +8,14 @@ use winit::{
         WindowEvent,
     },
     event_loop::{ControlFlow, EventLoop},
-    window::{Window, WindowBuilder},
+    window::{WindowBuilder},
 };
+use crate::vulkan::{VulkanContext, SynchronizationSet, CommandPool, VulkanSwapchain};
 
 pub trait App {
-    fn initialize(&mut self, _: &Window) {}
-    fn update(&mut self, _: f64) {}
-    fn render(&mut self) {}
+    fn initialize(&mut self, _: Arc<VulkanContext>) {}
+    fn update(&mut self, _: Arc<VulkanContext>, _: f64) {}
+    fn render(&mut self, _: Arc<VulkanContext>) {}
     fn cleanup(&mut self) {}
     fn handle_resize(&mut self, _: u32, _: u32) {}
     fn handle_key_pressed(&mut self, _: VirtualKeyCode, _: ElementState) {}
@@ -35,7 +37,29 @@ where
         .build(&event_loop)
         .expect("Failed to create window.");
 
-    app.initialize(&window);
+    let vulkan_context = Arc::new(VulkanContext::new(&window).expect("Failed to create a vulkan context!"));
+
+    let synchronization_set =
+        SynchronizationSet::new(vulkan_context.clone()).expect("Failed to create sync objects");
+
+    let command_pool = CommandPool::new(
+        vulkan_context.clone(),
+        vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
+    );
+
+    let transient_command_pool =
+        CommandPool::new(vulkan_context.clone(), vk::CommandPoolCreateFlags::TRANSIENT);
+
+    let logical_size = window.inner_size();
+    let dimensions = [logical_size.width as u32, logical_size.height as u32];
+
+    let vulkan_swapchain = Some(VulkanSwapchain::new(
+        vulkan_context.clone(),
+        dimensions,
+        &command_pool,
+    ));
+
+    app.initialize(vulkan_context.clone());
 
     let mut last_frame = Instant::now();
     event_loop.run(move |event, _, control_flow| {
@@ -45,7 +69,7 @@ where
                 let delta_time =
                     (Instant::now().duration_since(last_frame).as_micros() as f64) / 1_000_000_f64;
                 last_frame = Instant::now();
-                app.update(delta_time);
+                app.update(vulkan_context.clone(), delta_time);
             }
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
@@ -85,7 +109,7 @@ where
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
-                app.render();
+                app.render(vulkan_context.clone());
             }
             _ => {}
         }
