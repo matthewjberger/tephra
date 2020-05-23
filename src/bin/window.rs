@@ -1,4 +1,3 @@
-use ash::vk;
 use nalgebra_glm as glm;
 use support::{
     app::{run_app, App},
@@ -18,9 +17,7 @@ impl App for DemoApp {
     }
 }
 
-impl Command for DemoApp {
-    fn issue_commands(&mut self, _: vk::CommandBuffer) {}
-}
+impl Command for DemoApp {}
 
 fn main() {
     run_app(DemoApp::default(), "Vulkan Window");

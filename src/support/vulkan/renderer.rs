@@ -8,7 +8,7 @@ use std::sync::Arc;
 use winit::window::Window;
 
 pub trait Command {
-    fn issue_commands(&mut self, command_buffer: vk::CommandBuffer);
+    fn issue_commands(&mut self, _: &ash::Device, _: vk::CommandBuffer) {}
 }
 
 pub struct Renderer {
@@ -231,7 +231,10 @@ impl Renderer {
                 );
         }
 
-        command.issue_commands(command_buffer);
+        command.issue_commands(
+            self.context.logical_device().logical_device(),
+            command_buffer,
+        );
 
         unsafe {
             self.context
