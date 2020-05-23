@@ -252,3 +252,9 @@ impl Renderer {
         }
     }
 }
+
+impl Drop for Renderer {
+    fn drop(&mut self) {
+        self.context.logical_device().wait_idle();
+    }
+}
