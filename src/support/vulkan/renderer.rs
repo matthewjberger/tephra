@@ -7,6 +7,10 @@ use nalgebra_glm as glm;
 use std::sync::Arc;
 use winit::window::Window;
 
+pub trait Command {
+    fn issue_commands(&mut self, command_buffer: vk::CommandBuffer);
+}
+
 pub struct Renderer {
     pub context: Arc<VulkanContext>,
     pub vulkan_swapchain: Option<VulkanSwapchain>,
@@ -61,10 +65,7 @@ impl Renderer {
             .allocate_command_buffers(number_of_framebuffers as _);
     }
 
-    pub fn record_all_command_buffers<T>(&self, command_action: &T)
-    where
-        T: Fn(vk::CommandBuffer),
-    {
+    pub fn record_all_command_buffers(&self, command: &mut dyn Command) {
         // Create a single render pass per swapchain image that will draw each mesh
         self.command_pool
             .command_buffers()
@@ -73,14 +74,11 @@ impl Renderer {
             .for_each(|(index, buffer)| {
                 let command_buffer = *buffer;
                 let framebuffer = self.vulkan_swapchain().framebuffers[index].framebuffer();
-                self.record_single_command_buffer(framebuffer, command_buffer, &command_action);
+                self.record_single_command_buffer(framebuffer, command_buffer, command);
             });
     }
 
-    pub fn render<T>(&mut self, window_dimensions: glm::Vec2, command_action: &T)
-    where
-        T: Fn(vk::CommandBuffer),
-    {
+    pub fn render(&mut self, window_dimensions: glm::Vec2, command: &mut dyn Command) {
         let context = self.context.clone();
 
         let current_frame_synchronization = self
@@ -100,7 +98,7 @@ impl Renderer {
         let image_index = match image_index_result {
             Ok((image_index, _)) => image_index,
             Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
-                self.recreate_swapchain(window_dimensions, &command_action);
+                self.recreate_swapchain(window_dimensions, command);
                 return;
             }
             Err(error) => panic!("Error while acquiring next image. Cause: {}", error),
@@ -128,10 +126,10 @@ impl Renderer {
 
         match swapchain_presentation_result {
             Ok(is_suboptimal) if is_suboptimal => {
-                self.recreate_swapchain(window_dimensions, &command_action);
+                self.recreate_swapchain(window_dimensions, command);
             }
             Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
-                self.recreate_swapchain(window_dimensions, &command_action);
+                self.recreate_swapchain(window_dimensions, command);
             }
             Err(error) => panic!("Failed to present queue. Cause: {}", error),
             _ => {}
@@ -141,10 +139,7 @@ impl Renderer {
             (1 + self.current_frame) % SynchronizationSet::MAX_FRAMES_IN_FLIGHT as usize;
     }
 
-    pub fn recreate_swapchain<F>(&mut self, window_dimensions: glm::Vec2, command_action: &F)
-    where
-        F: Fn(vk::CommandBuffer),
-    {
+    pub fn recreate_swapchain(&mut self, window_dimensions: glm::Vec2, command: &mut dyn Command) {
         self.context.logical_device().wait_idle();
 
         self.vulkan_swapchain = None;
@@ -155,7 +150,7 @@ impl Renderer {
         );
         self.vulkan_swapchain = Some(new_swapchain);
 
-        self.record_all_command_buffers(&command_action);
+        self.record_all_command_buffers(command);
     }
 
     pub fn update_viewport(&self, command_buffer: vk::CommandBuffer) {
@@ -184,14 +179,12 @@ impl Renderer {
         }
     }
 
-    fn record_single_command_buffer<T>(
+    fn record_single_command_buffer(
         &self,
         framebuffer: vk::Framebuffer,
         command_buffer: vk::CommandBuffer,
-        command_action: &T,
-    ) where
-        T: Fn(vk::CommandBuffer),
-    {
+        command: &mut dyn Command,
+    ) {
         let command_buffer_begin_info = vk::CommandBufferBeginInfo::builder()
             .flags(vk::CommandBufferUsageFlags::SIMULTANEOUS_USE)
             .build();
@@ -238,7 +231,7 @@ impl Renderer {
                 );
         }
 
-        command_action(command_buffer);
+        command.issue_commands(command_buffer);
 
         unsafe {
             self.context
