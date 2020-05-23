@@ -9,6 +9,7 @@ use winit::window::Window;
 
 pub trait Command {
     fn issue_commands(&mut self, _: &ash::Device, _: vk::CommandBuffer) {}
+    fn recreate_pipelines(&mut self, _: Arc<VulkanContext>, _: &VulkanSwapchain) {}
 }
 
 pub struct Renderer {
@@ -150,6 +151,7 @@ impl Renderer {
         );
         self.vulkan_swapchain = Some(new_swapchain);
 
+        command.recreate_pipelines(self.context.clone(), self.vulkan_swapchain());
         self.record_all_command_buffers(command);
     }
 
