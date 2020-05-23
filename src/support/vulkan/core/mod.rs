@@ -8,6 +8,7 @@ pub use self::{
     instance::{Instance, InstanceError},
     logical_device::{LogicalDevice, LogicalDeviceError},
     physical_device::{PhysicalDevice, PhysicalDeviceError},
+    pipeline::GraphicsPipeline,
     pipeline_layout::PipelineLayout,
     queue_family_index_set::QueueFamilyIndexSet,
     renderpass::RenderPass,
@@ -33,6 +34,7 @@ pub mod image_view;
 pub mod instance;
 pub mod logical_device;
 pub mod physical_device;
+pub mod pipeline;
 pub mod pipeline_layout;
 pub mod queue_family_index_set;
 pub mod renderpass;
