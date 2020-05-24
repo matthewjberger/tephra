@@ -4,6 +4,7 @@ use crate::vulkan::{
 use ash::{version::DeviceV1_0, vk};
 use std::{ffi::CString, sync::Arc};
 
+// TODO: Move shader paths into separate struct to be constructed with the builder pattern
 pub struct RenderPipelineSettings {
     pub vertex_state_info: vk::PipelineVertexInputStateCreateInfo,
     pub descriptor_set_layout: DescriptorSetLayout,
