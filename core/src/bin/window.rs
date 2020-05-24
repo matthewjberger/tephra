@@ -3,12 +3,13 @@ use support::{
     app::{run_app, setup_app, App},
     vulkan::{Command, Renderer},
 };
+use winit::window::Window;
 
 #[derive(Default)]
 struct DemoApp;
 
 impl App for DemoApp {
-    fn initialize(&mut self, renderer: &mut Renderer) {
+    fn initialize(&mut self, _: &mut Window, renderer: &mut Renderer) {
         renderer.record_all_command_buffers(self as &mut dyn Command);
     }
 

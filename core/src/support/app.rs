@@ -12,8 +12,8 @@ use winit::{
 };
 
 pub trait App {
-    fn initialize(&mut self, _: &mut Renderer) {}
-    fn update(&mut self, _: &mut Renderer, _: f64) {}
+    fn initialize(&mut self, _: &mut Window, _: &mut Renderer) {}
+    fn update(&mut self, _: &mut Window, _: &mut Renderer, _: f64) {}
     fn draw(&mut self, _: &mut Renderer, _: glm::Vec2) {}
     fn handle_resize(&mut self, _: u32, _: u32) {}
     fn handle_key_pressed(&mut self, _: VirtualKeyCode, _: ElementState) {}
@@ -42,7 +42,7 @@ pub fn setup_app(title: &str) -> (Window, EventLoop<()>, Renderer) {
 
 pub fn run_app<T: 'static>(
     mut app: T,
-    window: Window,
+    mut window: Window,
     event_loop: EventLoop<()>,
     mut renderer: Renderer,
 ) where
@@ -50,7 +50,7 @@ pub fn run_app<T: 'static>(
 {
     renderer.allocate_command_buffers();
 
-    app.initialize(&mut renderer);
+    app.initialize(&mut window, &mut renderer);
 
     let mut last_frame = Instant::now();
     event_loop.run(move |event, _, control_flow| {
@@ -60,7 +60,7 @@ pub fn run_app<T: 'static>(
                 let delta_time =
                     (Instant::now().duration_since(last_frame).as_micros() as f64) / 1_000_000_f64;
                 last_frame = Instant::now();
-                app.update(&mut renderer, delta_time);
+                app.update(&mut window, &mut renderer, delta_time);
             }
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,

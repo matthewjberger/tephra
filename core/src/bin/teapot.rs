@@ -9,6 +9,7 @@ use support::{
         VulkanSwapchain,
     },
 };
+use winit::window::Window;
 
 fn main() {
     let (window, event_loop, renderer) = setup_app("Triangle");
@@ -47,12 +48,12 @@ impl Drop for DemoApp {
 }
 
 impl App for DemoApp {
-    fn initialize(&mut self, renderer: &mut Renderer) {
+    fn initialize(&mut self, _: &mut Window, renderer: &mut Renderer) {
         self.recreate_pipelines(renderer.context.clone(), renderer.vulkan_swapchain());
         renderer.record_all_command_buffers(self as &mut dyn Command);
     }
 
-    fn update(&mut self, renderer: &mut Renderer, _: f64) {
+    fn update(&mut self, _: &mut Window, renderer: &mut Renderer, _: f64) {
         self.rotation += 0.05;
         if (self.rotation - 360.0) > 0.001 {
             self.rotation = 0.0;
