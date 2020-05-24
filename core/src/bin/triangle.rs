@@ -5,9 +5,14 @@ use support::{
     app::{run_app, App},
     vulkan::{
         Buffer, Command, CommandPool, DescriptorPool, DescriptorSetLayout, GeometryBuffer,
-        RenderPipeline, RenderPipelineSettings, Renderer, VulkanContext, VulkanSwapchain,
+        PipelineRenderer, RenderPipeline, RenderPipelineSettings, Renderer, VulkanContext,
+        VulkanSwapchain,
     },
 };
+
+fn main() {
+    run_app(DemoApp::default(), "Triangle");
+}
 
 #[derive(Default)]
 struct DemoApp {
@@ -85,23 +90,39 @@ impl App for DemoApp {
 impl Command for DemoApp {
     fn issue_commands(&mut self, device: &ash::Device, command_buffer: vk::CommandBuffer) {
         let pipeline = self.pipeline.as_ref().expect("Failed to get pipeline!");
-        let triangle_renderer = TriangleRenderer::new(
+
+        let geometry_buffers = &self
+            .triangle
+            .as_ref()
+            .expect("Failed to get triangle data!")
+            .buffers;
+
+        let pipeline_renderer = PipelineRenderer {
             command_buffer,
-            &pipeline,
-            self.pipeline_data
+            pipeline_layout: pipeline.pipeline.layout(),
+            descriptor_set: self
+                .pipeline_data
                 .as_ref()
-                .expect("Failed to get pipeline data!"),
-        );
+                .expect("Failed to get pipeline data!")
+                .descriptor_set,
+            vertex_buffer: geometry_buffers.vertex_buffer.buffer(),
+            index_buffer: if let Some(index_buffer) = geometry_buffers.index_buffer.as_ref() {
+                Some(index_buffer.buffer())
+            } else {
+                None
+            },
+            dynamic_alignment: None,
+        };
+
+        pipeline_renderer.bind_geometry_buffers(device);
+
         pipeline.bind(device, command_buffer);
-        triangle_renderer.draw(
-            device,
-            command_buffer,
-            &self
-                .triangle
-                .as_ref()
-                .expect("Failed to get triangle data!")
-                .buffers,
-        );
+
+        pipeline_renderer.bind_descriptor_set(device);
+
+        unsafe {
+            device.cmd_draw_indexed(command_buffer, 3, 1, 0, 0, 1);
+        }
     }
 
     fn recreate_pipelines(&mut self, context: Arc<VulkanContext>, swapchain: &VulkanSwapchain) {
@@ -122,10 +143,6 @@ impl Command for DemoApp {
         self.pipeline = None;
         self.pipeline = Some(RenderPipeline::new(context, swapchain, &settings));
     }
-}
-
-fn main() {
-    run_app(DemoApp::default(), "Triangle");
 }
 
 pub struct Triangle {
@@ -256,61 +273,6 @@ impl TrianglePipelineData {
                 .logical_device()
                 .logical_device()
                 .update_descriptor_sets(&descriptor_writes, &[])
-        }
-    }
-}
-
-pub struct TriangleRenderer {
-    command_buffer: vk::CommandBuffer,
-    pipeline_layout: vk::PipelineLayout,
-    descriptor_set: vk::DescriptorSet,
-}
-
-impl TriangleRenderer {
-    pub fn new(
-        command_buffer: vk::CommandBuffer,
-        pipeline: &RenderPipeline,
-        pipeline_data: &TrianglePipelineData,
-    ) -> Self {
-        Self {
-            command_buffer,
-            pipeline_layout: pipeline.pipeline.layout(),
-            descriptor_set: pipeline_data.descriptor_set,
-        }
-    }
-
-    pub fn draw(
-        &self,
-        device: &ash::Device,
-        command_buffer: vk::CommandBuffer,
-        buffers: &GeometryBuffer,
-    ) {
-        let offsets = [0];
-        let vertex_buffers = [buffers.vertex_buffer.buffer()];
-
-        unsafe {
-            device.cmd_bind_vertex_buffers(command_buffer, 0, &vertex_buffers, &offsets);
-            device.cmd_bind_index_buffer(
-                command_buffer,
-                buffers
-                    .index_buffer
-                    .as_ref()
-                    .expect("Failed to get an index buffer!")
-                    .buffer(),
-                0,
-                vk::IndexType::UINT32,
-            );
-
-            device.cmd_bind_descriptor_sets(
-                self.command_buffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                self.pipeline_layout,
-                0,
-                &[self.descriptor_set],
-                &[],
-            );
-
-            device.cmd_draw_indexed(self.command_buffer, 3, 1, 0, 0, 1);
         }
     }
 }
