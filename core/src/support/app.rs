@@ -15,7 +15,6 @@ pub trait App {
     fn initialize(&mut self, _: &mut Renderer) {}
     fn update(&mut self, _: &mut Renderer, _: f64) {}
     fn draw(&mut self, _: &mut Renderer, _: glm::Vec2) {}
-    fn cleanup(&mut self) {}
     fn handle_resize(&mut self, _: u32, _: u32) {}
     fn handle_key_pressed(&mut self, _: VirtualKeyCode, _: ElementState) {}
     fn handle_mouse_clicked(&mut self, _: MouseButton, _: ElementState) {}
@@ -42,6 +41,7 @@ where
     let mut renderer = Renderer::new(vulkan_context, &window);
 
     renderer.allocate_command_buffers();
+
     app.initialize(&mut renderer);
 
     let mut last_frame = Instant::now();

@@ -187,13 +187,13 @@ impl Renderer {
         command_buffer: vk::CommandBuffer,
         command: &mut dyn Command,
     ) {
+        let device = self.context.logical_device().logical_device();
+
         let command_buffer_begin_info = vk::CommandBufferBeginInfo::builder()
             .flags(vk::CommandBufferUsageFlags::SIMULTANEOUS_USE)
             .build();
         unsafe {
-            self.context
-                .logical_device()
-                .logical_device()
+            device
                 .begin_command_buffer(command_buffer, &command_buffer_begin_info)
                 .expect("Failed to begin command buffer for the render pass!")
         };
@@ -223,20 +223,16 @@ impl Renderer {
             .build();
 
         unsafe {
-            self.context
-                .logical_device()
-                .logical_device()
-                .cmd_begin_render_pass(
-                    command_buffer,
-                    &render_pass_begin_info,
-                    vk::SubpassContents::INLINE,
-                );
+            device.cmd_begin_render_pass(
+                command_buffer,
+                &render_pass_begin_info,
+                vk::SubpassContents::INLINE,
+            );
         }
 
-        command.issue_commands(
-            self.context.logical_device().logical_device(),
-            command_buffer,
-        );
+        self.update_viewport(command_buffer);
+
+        command.issue_commands(device, command_buffer);
 
         unsafe {
             self.context
