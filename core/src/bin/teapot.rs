@@ -65,7 +65,7 @@ impl App for DemoApp {
         );
 
         let view = glm::look_at(
-            &glm::vec3(0.0, 0.0, -4.0),
+            &glm::vec3(0.0, -4.0, 4.0),
             &glm::vec3(0.0, 0.0, 0.0),
             &glm::vec3(0.0, 1.0, 0.0),
         );
@@ -91,11 +91,12 @@ impl Command for DemoApp {
     fn issue_commands(&mut self, device: &ash::Device, command_buffer: vk::CommandBuffer) {
         let pipeline = self.pipeline.as_ref().expect("Failed to get pipeline!");
 
-        let geometry_buffers = &self
+        let triangle = &self
             .triangle
             .as_ref()
-            .expect("Failed to get triangle data!")
-            .buffers;
+            .expect("Failed to get triangle data!");
+
+        let geometry_buffers = &triangle.buffers;
 
         let pipeline_renderer = PipelineRenderer {
             command_buffer,
@@ -121,7 +122,7 @@ impl Command for DemoApp {
         pipeline_renderer.bind_descriptor_set(device);
 
         unsafe {
-            device.cmd_draw_indexed(command_buffer, 3, 1, 0, 0, 1);
+            device.cmd_draw_indexed(command_buffer, triangle.number_of_indices, 1, 0, 0, 1);
         }
     }
 
@@ -136,8 +137,8 @@ impl Command for DemoApp {
         let settings = RenderPipelineSettings {
             vertex_state_info,
             descriptor_set_layout: TrianglePipelineData::descriptor_set_layout(context.clone()),
-            vertex_shader_path: "core/assets/shaders/triangle/triangle.vert.spv".to_string(),
-            fragment_shader_path: "core/assets/shaders/triangle/triangle.frag.spv".to_string(),
+            vertex_shader_path: "core/assets/shaders/model/model.vert.spv".to_string(),
+            fragment_shader_path: "core/assets/shaders/model/model.frag.spv".to_string(),
         };
 
         self.pipeline = None;
@@ -147,14 +148,21 @@ impl Command for DemoApp {
 
 pub struct Triangle {
     buffers: GeometryBuffer,
+    number_of_indices: u32,
 }
 
 impl Triangle {
     pub fn new(command_pool: &CommandPool) -> Self {
-        let vertices = vec![1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 0.0, -1.0, 0.0];
-        let indices = vec![0, 1, 2];
-        let buffers = GeometryBuffer::new(command_pool, &vertices, Some(&indices));
-        Self { buffers }
+        let (models, _) =
+            tobj::load_obj("core/assets/models/teapot.obj", false).expect("Failed to load file");
+        let vertices = &models[0].mesh.positions;
+        let indices = &models[0].mesh.indices;
+        let number_of_indices = indices.len() as u32;
+        let buffers = GeometryBuffer::new(command_pool, vertices, Some(indices));
+        Self {
+            buffers,
+            number_of_indices,
+        }
     }
 
     pub fn create_vertex_attributes() -> [vk::VertexInputAttributeDescription; 1] {

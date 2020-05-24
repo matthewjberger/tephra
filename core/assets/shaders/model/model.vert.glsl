@@ -10,6 +10,8 @@ layout(binding = 0) uniform Ubo {
 
 void main()
 {
-  gl_Position =  ubo.projection * ubo.view * ubo.model * vec4(inPos, 1.0);
+  vec3 pos = inPos;
+  pos.y *= -1.0;
+  gl_Position =  ubo.projection * ubo.view * ubo.model * vec4(pos, 1.0);
 }
 
