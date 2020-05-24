@@ -1,11 +1,10 @@
-use crate::vulkan::{DescriptorSetLayout, PipelineLayout, VulkanContext};
+use crate::vulkan::{PipelineLayout, VulkanContext};
 use ash::{version::DeviceV1_0, vk};
 use std::sync::Arc;
 
 pub struct GraphicsPipeline {
     pipeline: vk::Pipeline,
     pipeline_layout: PipelineLayout,
-    descriptor_set_layout: DescriptorSetLayout,
     context: Arc<VulkanContext>,
 }
 
@@ -14,7 +13,6 @@ impl GraphicsPipeline {
         context: Arc<VulkanContext>,
         create_info: vk::GraphicsPipelineCreateInfo,
         pipeline_layout: PipelineLayout,
-        descriptor_set_layout: DescriptorSetLayout,
     ) -> Self {
         let pipeline_create_info_arr = [create_info];
         let pipeline = unsafe {
@@ -32,7 +30,6 @@ impl GraphicsPipeline {
         GraphicsPipeline {
             pipeline,
             pipeline_layout,
-            descriptor_set_layout,
             context,
         }
     }
@@ -43,10 +40,6 @@ impl GraphicsPipeline {
 
     pub fn layout(&self) -> vk::PipelineLayout {
         self.pipeline_layout.layout()
-    }
-
-    pub fn descriptor_set_layout(&self) -> vk::DescriptorSetLayout {
-        self.descriptor_set_layout.layout()
     }
 }
 
