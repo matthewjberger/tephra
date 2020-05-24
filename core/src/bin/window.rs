@@ -1,6 +1,6 @@
 use nalgebra_glm as glm;
 use support::{
-    app::{run_app, setup_app, App},
+    app::{run_app, setup_app, App, AppState},
     vulkan::{Command, Renderer},
 };
 use winit::window::Window;
@@ -13,8 +13,14 @@ impl App for DemoApp {
         renderer.record_all_command_buffers(self as &mut dyn Command);
     }
 
-    fn draw(&mut self, renderer: &mut Renderer, window_dimensions: glm::Vec2) {
-        renderer.render(window_dimensions, self as &mut dyn Command);
+    fn draw(&mut self, renderer: &mut Renderer, app_state: &AppState) {
+        renderer.render(
+            glm::vec2(
+                app_state.window_dimensions.width as f32,
+                app_state.window_dimensions.height as f32,
+            ),
+            self as &mut dyn Command,
+        );
     }
 }
 

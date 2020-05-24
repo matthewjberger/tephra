@@ -2,14 +2,15 @@ use ash::{version::DeviceV1_0, vk};
 use nalgebra_glm as glm;
 use std::{mem, sync::Arc};
 use support::{
-    app::{run_app, setup_app, App},
+    app::{run_app, setup_app, App, AppState},
+    camera::{CameraDirection, FreeCamera},
     vulkan::{
         Buffer, Command, CommandPool, DescriptorPool, DescriptorSetLayout, GeometryBuffer,
         PipelineRenderer, RenderPipeline, RenderPipelineSettings, Renderer, VulkanContext,
         VulkanSwapchain,
     },
 };
-use winit::window::Window;
+use winit::{dpi::LogicalPosition, event::VirtualKeyCode, window::Window};
 
 fn main() {
     let (window, event_loop, renderer) = setup_app("Triangle");
@@ -27,6 +28,7 @@ struct DemoApp {
     pipeline: Option<RenderPipeline>,
     pipeline_data: TrianglePipelineData,
     rotation: f32,
+    camera: FreeCamera,
 }
 
 impl DemoApp {
@@ -37,6 +39,7 @@ impl DemoApp {
             pipeline: None,
             pipeline_data: TrianglePipelineData::new(context),
             rotation: 0.0,
+            camera: FreeCamera::default(),
         }
     }
 }
@@ -48,12 +51,51 @@ impl Drop for DemoApp {
 }
 
 impl App for DemoApp {
-    fn initialize(&mut self, _: &mut Window, renderer: &mut Renderer) {
+    fn initialize(&mut self, window: &mut Window, renderer: &mut Renderer) {
         self.recreate_pipelines(renderer.context.clone(), renderer.vulkan_swapchain());
         renderer.record_all_command_buffers(self as &mut dyn Command);
+
+        window.set_cursor_visible(false);
+        window
+            .set_cursor_grab(true)
+            .expect("Failed to grab cursor!");
+
+        self.camera.position_at(&glm::vec3(0.0, -4.0, -4.0));
+        self.camera.look_at(&glm::vec3(0.0, 0.0, 0.0));
     }
 
-    fn update(&mut self, _: &mut Window, renderer: &mut Renderer, _: f64) {
+    fn update(&mut self, window: &mut Window, renderer: &mut Renderer, app_state: &AppState) {
+        if app_state.input.is_key_pressed(VirtualKeyCode::W) {
+            self.camera
+                .translate(CameraDirection::Forward, app_state.delta_time as f32);
+        }
+
+        if app_state.input.is_key_pressed(VirtualKeyCode::A) {
+            self.camera
+                .translate(CameraDirection::Left, app_state.delta_time as f32);
+        }
+
+        if app_state.input.is_key_pressed(VirtualKeyCode::S) {
+            self.camera
+                .translate(CameraDirection::Backward, app_state.delta_time as f32);
+        }
+
+        if app_state.input.is_key_pressed(VirtualKeyCode::D) {
+            self.camera
+                .translate(CameraDirection::Right, app_state.delta_time as f32);
+        }
+
+        let offset = app_state.input.mouse.offset_from_center;
+        self.camera
+            .process_mouse_movement(offset.x, -1.0 * offset.y);
+
+        window
+            .set_cursor_position(LogicalPosition::new(
+                (app_state.window_dimensions.width as f32 / 2.0) as i32,
+                (app_state.window_dimensions.height as f32 / 2.0) as i32,
+            ))
+            .expect("Failed to set cursor position!");
+
         self.rotation += 0.05;
         if (self.rotation - 360.0) > 0.001 {
             self.rotation = 0.0;
@@ -76,15 +118,9 @@ impl App for DemoApp {
             1000_f32,
         );
 
-        let view = glm::look_at(
-            &glm::vec3(0.0, -4.0, 4.0),
-            &glm::vec3(0.0, 0.0, 0.0),
-            &glm::vec3(0.0, 1.0, 0.0),
-        );
-
         let ubo = UniformBufferObject {
             model,
-            view,
+            view: self.camera.view_matrix(),
             projection,
         };
         let ubos = [ubo];
@@ -92,8 +128,14 @@ impl App for DemoApp {
         self.pipeline_data.uniform_buffer.upload_to_buffer(&ubos, 0);
     }
 
-    fn draw(&mut self, renderer: &mut Renderer, window_dimensions: glm::Vec2) {
-        renderer.render(window_dimensions, self as &mut dyn Command);
+    fn draw(&mut self, renderer: &mut Renderer, app_state: &AppState) {
+        renderer.render(
+            glm::vec2(
+                app_state.window_dimensions.width as f32,
+                app_state.window_dimensions.height as f32,
+            ),
+            self as &mut dyn Command,
+        );
     }
 }
 
