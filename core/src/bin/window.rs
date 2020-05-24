@@ -1,6 +1,6 @@
 use nalgebra_glm as glm;
 use support::{
-    app::{run_app, App},
+    app::{run_app, setup_app, App},
     vulkan::{Command, Renderer},
 };
 
@@ -20,5 +20,6 @@ impl App for DemoApp {
 impl Command for DemoApp {}
 
 fn main() {
-    run_app(DemoApp::default(), "Vulkan Window");
+    let (window, event_loop, renderer) = setup_app("Vulkan Window");
+    run_app(DemoApp::default(), window, event_loop, renderer);
 }

@@ -8,7 +8,7 @@ use winit::{
         WindowEvent,
     },
     event_loop::{ControlFlow, EventLoop},
-    window::WindowBuilder,
+    window::{Window, WindowBuilder},
 };
 
 pub trait App {
@@ -22,10 +22,7 @@ pub trait App {
     fn handle_cursor_moved(&mut self, _: glm::Vec2) {}
 }
 
-pub fn run_app<T: 'static>(mut app: T, title: &str)
-where
-    T: App,
-{
+pub fn setup_app(title: &str) -> (Window, EventLoop<()>, Renderer) {
     let (width, height) = (1920, 1080);
 
     let event_loop = EventLoop::new();
@@ -38,8 +35,19 @@ where
     let vulkan_context =
         Arc::new(VulkanContext::new(&window).expect("Failed to create a vulkan context!"));
 
-    let mut renderer = Renderer::new(vulkan_context, &window);
+    let renderer = Renderer::new(vulkan_context, &window);
 
+    (window, event_loop, renderer)
+}
+
+pub fn run_app<T: 'static>(
+    mut app: T,
+    window: Window,
+    event_loop: EventLoop<()>,
+    mut renderer: Renderer,
+) where
+    T: App,
+{
     renderer.allocate_command_buffers();
 
     app.initialize(&mut renderer);

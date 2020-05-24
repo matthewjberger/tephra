@@ -2,7 +2,7 @@ use ash::{version::DeviceV1_0, vk};
 use nalgebra_glm as glm;
 use std::{mem, sync::Arc};
 use support::{
-    app::{run_app, App},
+    app::{run_app, setup_app, App},
     vulkan::{
         Buffer, Command, CommandPool, DescriptorPool, DescriptorSetLayout, GeometryBuffer,
         PipelineRenderer, RenderPipeline, RenderPipelineSettings, Renderer, VulkanContext,
@@ -11,33 +11,43 @@ use support::{
 };
 
 fn main() {
-    run_app(DemoApp::default(), "Triangle");
+    let (window, event_loop, renderer) = setup_app("Triangle");
+    run_app(
+        DemoApp::new(renderer.context.clone(), &renderer.command_pool),
+        window,
+        event_loop,
+        renderer,
+    );
 }
 
-#[derive(Default)]
 struct DemoApp {
-    context: Option<Arc<VulkanContext>>,
-    triangle: Option<Triangle>,
+    context: Arc<VulkanContext>,
+    triangle: Triangle,
     pipeline: Option<RenderPipeline>,
-    pipeline_data: Option<TrianglePipelineData>,
+    pipeline_data: TrianglePipelineData,
     rotation: f32,
+}
+
+impl DemoApp {
+    pub fn new(context: Arc<VulkanContext>, command_pool: &CommandPool) -> Self {
+        Self {
+            context: context.clone(),
+            triangle: Triangle::new(&command_pool),
+            pipeline: None,
+            pipeline_data: TrianglePipelineData::new(context),
+            rotation: 0.0,
+        }
+    }
 }
 
 impl Drop for DemoApp {
     fn drop(&mut self) {
-        self.context
-            .as_ref()
-            .expect("Failed to get vulkan context!")
-            .logical_device()
-            .wait_idle();
+        self.context.logical_device().wait_idle();
     }
 }
 
 impl App for DemoApp {
     fn initialize(&mut self, renderer: &mut Renderer) {
-        self.context = Some(renderer.context.clone());
-        self.triangle = Some(Triangle::new(&renderer.command_pool));
-        self.pipeline_data = Some(TrianglePipelineData::new(renderer.context.clone()));
         self.recreate_pipelines(renderer.context.clone(), renderer.vulkan_swapchain());
         renderer.record_all_command_buffers(self as &mut dyn Command);
     }
@@ -47,6 +57,7 @@ impl App for DemoApp {
         if (self.rotation - 360.0) > 0.001 {
             self.rotation = 0.0;
         }
+
         let model = glm::rotate(
             &glm::Mat4::identity(),
             self.rotation.to_radians(),
@@ -77,9 +88,7 @@ impl App for DemoApp {
         };
         let ubos = [ubo];
 
-        if let Some(pipeline_data) = self.pipeline_data.as_ref() {
-            pipeline_data.uniform_buffer.upload_to_buffer(&ubos, 0);
-        }
+        self.pipeline_data.uniform_buffer.upload_to_buffer(&ubos, 0);
     }
 
     fn draw(&mut self, renderer: &mut Renderer, window_dimensions: glm::Vec2) {
@@ -91,21 +100,12 @@ impl Command for DemoApp {
     fn issue_commands(&mut self, device: &ash::Device, command_buffer: vk::CommandBuffer) {
         let pipeline = self.pipeline.as_ref().expect("Failed to get pipeline!");
 
-        let triangle = &self
-            .triangle
-            .as_ref()
-            .expect("Failed to get triangle data!");
-
-        let geometry_buffers = &triangle.buffers;
+        let geometry_buffers = &self.triangle.buffers;
 
         let pipeline_renderer = PipelineRenderer {
             command_buffer,
             pipeline_layout: pipeline.pipeline.layout(),
-            descriptor_set: self
-                .pipeline_data
-                .as_ref()
-                .expect("Failed to get pipeline data!")
-                .descriptor_set,
+            descriptor_set: self.pipeline_data.descriptor_set,
             vertex_buffer: geometry_buffers.vertex_buffer.buffer(),
             index_buffer: if let Some(index_buffer) = geometry_buffers.index_buffer.as_ref() {
                 Some(index_buffer.buffer())
@@ -122,7 +122,7 @@ impl Command for DemoApp {
         pipeline_renderer.bind_descriptor_set(device);
 
         unsafe {
-            device.cmd_draw_indexed(command_buffer, triangle.number_of_indices, 1, 0, 0, 1);
+            device.cmd_draw_indexed(command_buffer, self.triangle.number_of_indices, 1, 0, 0, 1);
         }
     }
 
