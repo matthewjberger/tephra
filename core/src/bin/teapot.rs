@@ -108,10 +108,7 @@ impl App for DemoApp {
 
     fn draw(&mut self, renderer: &mut Renderer, app_state: &AppState) {
         renderer.render(
-            glm::vec2(
-                app_state.window_dimensions.width as f32,
-                app_state.window_dimensions.height as f32,
-            ),
+            app_state.window_dimensions.as_vec2(),
             self as &mut dyn Command,
         );
     }
@@ -159,10 +156,12 @@ impl Command for DemoApp {
             descriptor_set_layout: ModelPipelineData::descriptor_set_layout(context.clone()),
             vertex_shader_path: "core/assets/shaders/model/model.vert.spv".to_string(),
             fragment_shader_path: "core/assets/shaders/model/model.frag.spv".to_string(),
+            blended: false,
+            push_constant_range: None,
         };
 
         self.pipeline = None;
-        self.pipeline = Some(RenderPipeline::new(context, swapchain, &settings));
+        self.pipeline = Some(RenderPipeline::new(context, swapchain, settings));
     }
 }
 

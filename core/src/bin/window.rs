@@ -1,4 +1,3 @@
-use nalgebra_glm as glm;
 use support::{
     app::{run_app, setup_app, App, AppState},
     vulkan::{Command, Renderer},
@@ -15,10 +14,7 @@ impl App for DemoApp {
 
     fn draw(&mut self, renderer: &mut Renderer, app_state: &AppState) {
         renderer.render(
-            glm::vec2(
-                app_state.window_dimensions.width as f32,
-                app_state.window_dimensions.height as f32,
-            ),
+            app_state.window_dimensions.as_vec2(),
             self as &mut dyn Command,
         );
     }

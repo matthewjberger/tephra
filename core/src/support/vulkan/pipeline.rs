@@ -4,15 +4,19 @@ use crate::vulkan::{
 use ash::{version::DeviceV1_0, vk};
 use std::{ffi::CString, sync::Arc};
 
+// TODO: Add a builder for this struct
 // TODO: Move shader paths into separate struct to be constructed with the builder pattern
 pub struct RenderPipelineSettings {
     pub vertex_state_info: vk::PipelineVertexInputStateCreateInfo,
     pub descriptor_set_layout: DescriptorSetLayout,
     pub vertex_shader_path: String,
     pub fragment_shader_path: String,
+    pub blended: bool,
+    pub push_constant_range: Option<vk::PushConstantRange>,
 }
 
 pub struct RenderPipeline {
+    pub settings: RenderPipelineSettings,
     pub pipeline: GraphicsPipeline,
 }
 
@@ -20,10 +24,10 @@ impl RenderPipeline {
     pub fn new(
         context: Arc<VulkanContext>,
         swapchain: &VulkanSwapchain,
-        settings: &RenderPipelineSettings,
+        settings: RenderPipelineSettings,
     ) -> Self {
         let (vertex_shader, fragment_shader, _shader_entry_point_name) =
-            Self::create_shaders(context.clone(), settings);
+            Self::create_shaders(context.clone(), &settings);
         let shader_state_info = [vertex_shader.state_info(), fragment_shader.state_info()];
 
         let input_assembly_create_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
@@ -64,7 +68,11 @@ impl RenderPipeline {
             .back(Default::default())
             .build();
 
-        let color_blend_attachments = Self::create_color_blend_attachments();
+        let color_blend_attachments = if settings.blended {
+            Self::create_color_blend_attachments_blended()
+        } else {
+            Self::create_color_blend_attachments_opaque()
+        };
 
         let color_blending_info = vk::PipelineColorBlendStateCreateInfo::builder()
             .logic_op_enable(false)
@@ -73,8 +81,7 @@ impl RenderPipeline {
             .blend_constants([0.0, 0.0, 0.0, 0.0])
             .build();
 
-        let descriptor_set_layout = &settings.descriptor_set_layout;
-        let pipeline_layout = Self::create_pipeline_layout(context.clone(), descriptor_set_layout);
+        let pipeline_layout = Self::create_pipeline_layout(context.clone(), &settings);
 
         let mut viewport_create_info = vk::PipelineViewportStateCreateInfo::default();
         viewport_create_info.viewport_count = 1;
@@ -103,7 +110,7 @@ impl RenderPipeline {
 
         let pipeline = GraphicsPipeline::new(context, pipeline_create_info, pipeline_layout);
 
-        Self { pipeline }
+        Self { pipeline, settings }
     }
 
     fn create_shaders(
@@ -132,7 +139,7 @@ impl RenderPipeline {
         (vertex_shader, fragment_shader, shader_entry_point_name)
     }
 
-    pub fn create_color_blend_attachments() -> [vk::PipelineColorBlendAttachmentState; 1] {
+    pub fn create_color_blend_attachments_opaque() -> [vk::PipelineColorBlendAttachmentState; 1] {
         let color_blend_attachment = vk::PipelineColorBlendAttachmentState::builder()
             .color_write_mask(vk::ColorComponentFlags::all())
             .blend_enable(false)
@@ -146,17 +153,37 @@ impl RenderPipeline {
         [color_blend_attachment]
     }
 
+    pub fn create_color_blend_attachments_blended() -> [vk::PipelineColorBlendAttachmentState; 1] {
+        let color_blend_attachment = vk::PipelineColorBlendAttachmentState::builder()
+            .color_write_mask(vk::ColorComponentFlags::all())
+            .blend_enable(true)
+            .src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
+            .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+            .color_blend_op(vk::BlendOp::ADD)
+            .src_alpha_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+            .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
+            .alpha_blend_op(vk::BlendOp::ADD)
+            .build();
+        [color_blend_attachment]
+    }
+
     pub fn create_pipeline_layout(
         context: Arc<VulkanContext>,
-        descriptor_set_layout: &DescriptorSetLayout,
+        settings: &RenderPipelineSettings,
     ) -> PipelineLayout {
-        let descriptor_set_layouts = [descriptor_set_layout.layout()];
+        let descriptor_set_layouts = [settings.descriptor_set_layout.layout()];
 
-        let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::builder()
-            .set_layouts(&descriptor_set_layouts)
-            .build();
-
-        PipelineLayout::new(context, pipeline_layout_create_info)
+        if let Some(push_constant_range) = settings.push_constant_range.as_ref() {
+            let push_constant_ranges = [*push_constant_range];
+            let pipeline_layout_create_info_builder = vk::PipelineLayoutCreateInfo::builder()
+                .push_constant_ranges(&push_constant_ranges)
+                .set_layouts(&descriptor_set_layouts);
+            PipelineLayout::new(context, pipeline_layout_create_info_builder.build())
+        } else {
+            let pipeline_layout_create_info_builder =
+                vk::PipelineLayoutCreateInfo::builder().set_layouts(&descriptor_set_layouts);
+            PipelineLayout::new(context, pipeline_layout_create_info_builder.build())
+        }
     }
 
     pub fn bind(&self, device: &ash::Device, command_buffer: vk::CommandBuffer) {

@@ -24,6 +24,10 @@ impl Dimensions {
     pub fn new(width: u32, height: u32) -> Self {
         Self { width, height }
     }
+
+    pub fn as_vec2(&self) -> glm::Vec2 {
+        glm::vec2(self.width as _, self.height as _)
+    }
 }
 
 #[derive(Default)]
