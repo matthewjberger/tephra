@@ -4,16 +4,16 @@ use std::{mem, sync::Arc};
 use support::{
     app::{run_app, setup_app, App, AppState},
     camera::{CameraDirection, FreeCamera},
+    model::ObjModel,
     vulkan::{
-        Buffer, Command, CommandPool, DescriptorPool, DescriptorSetLayout, GeometryBuffer,
-        PipelineRenderer, RenderPipeline, RenderPipelineSettings, Renderer, VulkanContext,
-        VulkanSwapchain,
+        Buffer, Command, CommandPool, DescriptorPool, DescriptorSetLayout, PipelineRenderer,
+        RenderPipeline, RenderPipelineSettings, Renderer, VulkanContext, VulkanSwapchain,
     },
 };
 use winit::{dpi::PhysicalPosition, event::VirtualKeyCode, window::Window};
 
 fn main() {
-    let (window, event_loop, renderer) = setup_app("Triangle");
+    let (window, event_loop, renderer) = setup_app("Model");
     run_app(
         DemoApp::new(renderer.context.clone(), &renderer.command_pool),
         window,
@@ -24,9 +24,9 @@ fn main() {
 
 struct DemoApp {
     context: Arc<VulkanContext>,
-    triangle: Triangle,
+    model: ObjModel,
     pipeline: Option<RenderPipeline>,
-    pipeline_data: TrianglePipelineData,
+    pipeline_data: ModelPipelineData,
     rotation: f32,
     camera: FreeCamera,
 }
@@ -35,9 +35,9 @@ impl DemoApp {
     pub fn new(context: Arc<VulkanContext>, command_pool: &CommandPool) -> Self {
         Self {
             context: context.clone(),
-            triangle: Triangle::new(&command_pool),
+            model: ObjModel::new(&command_pool),
             pipeline: None,
-            pipeline_data: TrianglePipelineData::new(context),
+            pipeline_data: ModelPipelineData::new(context),
             rotation: 0.0,
             camera: FreeCamera::default(),
         }
@@ -149,7 +149,7 @@ impl Command for DemoApp {
     fn issue_commands(&mut self, device: &ash::Device, command_buffer: vk::CommandBuffer) {
         let pipeline = self.pipeline.as_ref().expect("Failed to get pipeline!");
 
-        let geometry_buffers = &self.triangle.buffers;
+        let geometry_buffers = &self.model.buffers;
 
         let pipeline_renderer = PipelineRenderer {
             command_buffer,
@@ -171,13 +171,13 @@ impl Command for DemoApp {
         pipeline_renderer.bind_descriptor_set(device);
 
         unsafe {
-            device.cmd_draw_indexed(command_buffer, self.triangle.number_of_indices, 1, 0, 0, 1);
+            device.cmd_draw_indexed(command_buffer, self.model.number_of_indices, 1, 0, 0, 1);
         }
     }
 
     fn recreate_pipelines(&mut self, context: Arc<VulkanContext>, swapchain: &VulkanSwapchain) {
-        let descriptions = Triangle::create_vertex_input_descriptions();
-        let attributes = Triangle::create_vertex_attributes();
+        let descriptions = ObjModel::create_vertex_input_descriptions();
+        let attributes = ObjModel::create_vertex_attributes();
         let vertex_state_info = vk::PipelineVertexInputStateCreateInfo::builder()
             .vertex_binding_descriptions(&descriptions)
             .vertex_attribute_descriptions(&attributes)
@@ -185,53 +185,13 @@ impl Command for DemoApp {
 
         let settings = RenderPipelineSettings {
             vertex_state_info,
-            descriptor_set_layout: TrianglePipelineData::descriptor_set_layout(context.clone()),
+            descriptor_set_layout: ModelPipelineData::descriptor_set_layout(context.clone()),
             vertex_shader_path: "core/assets/shaders/model/model.vert.spv".to_string(),
             fragment_shader_path: "core/assets/shaders/model/model.frag.spv".to_string(),
         };
 
         self.pipeline = None;
         self.pipeline = Some(RenderPipeline::new(context, swapchain, &settings));
-    }
-}
-
-pub struct Triangle {
-    buffers: GeometryBuffer,
-    number_of_indices: u32,
-}
-
-impl Triangle {
-    pub fn new(command_pool: &CommandPool) -> Self {
-        let (models, _) =
-            tobj::load_obj("core/assets/models/teapot.obj", false).expect("Failed to load file");
-        let vertices = &models[0].mesh.positions;
-        let indices = &models[0].mesh.indices;
-        let number_of_indices = indices.len() as u32;
-        let buffers = GeometryBuffer::new(command_pool, vertices, Some(indices));
-        Self {
-            buffers,
-            number_of_indices,
-        }
-    }
-
-    pub fn create_vertex_attributes() -> [vk::VertexInputAttributeDescription; 1] {
-        let position_description = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
-            .location(0)
-            .format(vk::Format::R32G32B32_SFLOAT)
-            .offset(0)
-            .build();
-
-        [position_description]
-    }
-
-    pub fn create_vertex_input_descriptions() -> [vk::VertexInputBindingDescription; 1] {
-        let vertex_input_binding_description = vk::VertexInputBindingDescription::builder()
-            .binding(0)
-            .stride((3 * std::mem::size_of::<f32>()) as _)
-            .input_rate(vk::VertexInputRate::VERTEX)
-            .build();
-        [vertex_input_binding_description]
     }
 }
 
@@ -242,14 +202,14 @@ pub struct UniformBufferObject {
     pub projection: glm::Mat4,
 }
 
-pub struct TrianglePipelineData {
+pub struct ModelPipelineData {
     pub descriptor_pool: DescriptorPool,
     pub uniform_buffer: Buffer,
     pub descriptor_set: vk::DescriptorSet,
     pub descriptor_set_layout: DescriptorSetLayout,
 }
 
-impl TrianglePipelineData {
+impl ModelPipelineData {
     pub fn new(context: Arc<VulkanContext>) -> Self {
         let descriptor_set_layout = Self::descriptor_set_layout(context.clone());
         let descriptor_pool = Self::create_descriptor_pool(context.clone());
@@ -263,7 +223,7 @@ impl TrianglePipelineData {
             vk_mem::MemoryUsage::CpuToGpu,
         );
 
-        let data = TrianglePipelineData {
+        let data = ModelPipelineData {
             descriptor_pool,
             uniform_buffer,
             descriptor_set,
