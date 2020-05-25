@@ -1,8 +1,8 @@
 use crate::{
-    model::ObjModel,
+    byte_slice_from,
     vulkan::{
-        byte_slice_from, CommandPool, Cubemap, DescriptorPool, DescriptorSetLayout, Framebuffer,
-        GraphicsPipeline, ImageLayoutTransition, Offscreen, PipelineLayout, RenderPass, Shader,
+        CommandPool, Cubemap, DescriptorPool, DescriptorSetLayout, Framebuffer, GraphicsPipeline,
+        ImageLayoutTransition, ObjModel, Offscreen, PipelineLayout, RenderPass, Shader,
         VulkanContext,
     },
 };

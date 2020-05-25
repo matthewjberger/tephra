@@ -1,9 +1,9 @@
 use crate::{
-    model::ObjModel,
+    byte_slice_from,
     vulkan::{
-        byte_slice_from, CommandPool, Cubemap, DescriptorPool, DescriptorSetLayout, Framebuffer,
-        GraphicsPipeline, ImageLayoutTransition, ImageView, PipelineLayout, RenderPass, Shader,
-        Texture, TextureBundle, TextureDescription, VulkanContext,
+        CommandPool, Cubemap, DescriptorPool, DescriptorSetLayout, Framebuffer, GraphicsPipeline,
+        ImageLayoutTransition, ImageView, ObjModel, PipelineLayout, RenderPass, Shader, Texture,
+        TextureBundle, TextureDescription, VulkanContext,
     },
 };
 use ash::{version::DeviceV1_0, vk};

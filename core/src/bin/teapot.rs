@@ -4,10 +4,9 @@ use std::{mem, sync::Arc};
 use support::{
     app::{run_app, setup_app, App, AppState},
     camera::FreeCamera,
-    model::ObjModel,
     vulkan::{
-        Buffer, Command, CommandPool, DescriptorPool, DescriptorSetLayout, RenderPipeline,
-        RenderPipelineSettings, Renderer, VulkanContext, VulkanSwapchain,
+        Buffer, Command, CommandPool, DescriptorPool, DescriptorSetLayout, ObjModel,
+        RenderPipeline, RenderPipelineSettings, Renderer, VulkanContext, VulkanSwapchain,
     },
 };
 use winit::window::Window;

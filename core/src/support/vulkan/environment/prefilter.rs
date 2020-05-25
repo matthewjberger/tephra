@@ -1,7 +1,10 @@
-use crate::vulkan::{
-    byte_slice_from, CommandPool, Cubemap, DescriptorPool, DescriptorSetLayout, Framebuffer,
-    GeometryBuffer, GraphicsPipeline, ImageLayoutTransition, Offscreen, PipelineLayout, RenderPass,
-    Shader, VulkanContext,
+use crate::{
+    byte_slice_from,
+    vulkan::{
+        CommandPool, Cubemap, DescriptorPool, DescriptorSetLayout, Framebuffer, GeometryBuffer,
+        GraphicsPipeline, ImageLayoutTransition, Offscreen, PipelineLayout, RenderPass, Shader,
+        VulkanContext,
+    },
 };
 use ash::{version::DeviceV1_0, vk};
 use nalgebra_glm as glm;
