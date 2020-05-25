@@ -1,4 +1,6 @@
+use crate::app::AppState;
 use nalgebra_glm as glm;
+use winit::event::VirtualKeyCode;
 
 pub enum CameraDirection {
     Forward,
@@ -61,7 +63,7 @@ impl FreeCamera {
         glm::look_at(&self.position, &target, &self.up)
     }
 
-    pub fn translate(&mut self, direction: CameraDirection, delta_time: f32) {
+    fn translate(&mut self, direction: CameraDirection, delta_time: f32) {
         let velocity = self.speed * delta_time;
         match direction {
             CameraDirection::Forward => self.position += self.front * velocity,
@@ -71,7 +73,7 @@ impl FreeCamera {
         };
     }
 
-    pub fn process_mouse_movement(&mut self, x_offset: f32, y_offset: f32) {
+    fn process_mouse_movement(&mut self, x_offset: f32, y_offset: f32) {
         let (x_offset, y_offset) = (x_offset * self.sensitivity, y_offset * self.sensitivity);
 
         self.yaw_degrees -= x_offset;
@@ -98,5 +100,26 @@ impl FreeCamera {
         .normalize();
         self.right = self.front.cross(&self.world_up).normalize();
         self.up = self.right.cross(&self.front).normalize();
+    }
+
+    pub fn update(&mut self, app_state: &AppState) {
+        if app_state.input.is_key_pressed(VirtualKeyCode::W) {
+            self.translate(CameraDirection::Forward, app_state.delta_time as f32);
+        }
+
+        if app_state.input.is_key_pressed(VirtualKeyCode::A) {
+            self.translate(CameraDirection::Left, app_state.delta_time as f32);
+        }
+
+        if app_state.input.is_key_pressed(VirtualKeyCode::S) {
+            self.translate(CameraDirection::Backward, app_state.delta_time as f32);
+        }
+
+        if app_state.input.is_key_pressed(VirtualKeyCode::D) {
+            self.translate(CameraDirection::Right, app_state.delta_time as f32);
+        }
+
+        let offset = app_state.input.mouse.offset_from_center;
+        self.process_mouse_movement(offset.x, offset.y);
     }
 }

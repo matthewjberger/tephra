@@ -3,14 +3,14 @@ use nalgebra_glm as glm;
 use std::{mem, sync::Arc};
 use support::{
     app::{run_app, setup_app, App, AppState},
-    camera::{CameraDirection, FreeCamera},
+    camera::FreeCamera,
     model::ObjModel,
     vulkan::{
         Buffer, Command, CommandPool, DescriptorPool, DescriptorSetLayout, PipelineRenderer,
         RenderPipeline, RenderPipelineSettings, Renderer, VulkanContext, VulkanSwapchain,
     },
 };
-use winit::{dpi::PhysicalPosition, event::VirtualKeyCode, window::Window};
+use winit::{dpi::PhysicalPosition, window::Window};
 
 fn main() {
     let (window, event_loop, renderer) = setup_app("Model");
@@ -72,28 +72,7 @@ impl App for DemoApp {
     }
 
     fn update(&mut self, window: &mut Window, renderer: &mut Renderer, app_state: &AppState) {
-        if app_state.input.is_key_pressed(VirtualKeyCode::W) {
-            self.camera
-                .translate(CameraDirection::Forward, app_state.delta_time as f32);
-        }
-
-        if app_state.input.is_key_pressed(VirtualKeyCode::A) {
-            self.camera
-                .translate(CameraDirection::Left, app_state.delta_time as f32);
-        }
-
-        if app_state.input.is_key_pressed(VirtualKeyCode::S) {
-            self.camera
-                .translate(CameraDirection::Backward, app_state.delta_time as f32);
-        }
-
-        if app_state.input.is_key_pressed(VirtualKeyCode::D) {
-            self.camera
-                .translate(CameraDirection::Right, app_state.delta_time as f32);
-        }
-
-        let offset = app_state.input.mouse.offset_from_center;
-        self.camera.process_mouse_movement(offset.x, offset.y);
+        self.camera.update(&app_state);
 
         self.rotation += 0.05;
         if (self.rotation - 360.0) > 0.001 {
