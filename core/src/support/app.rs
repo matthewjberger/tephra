@@ -5,7 +5,7 @@ use crate::{
 use nalgebra_glm as glm;
 use std::{sync::Arc, time::Instant};
 use winit::{
-    dpi::PhysicalSize,
+    dpi::{PhysicalPosition, PhysicalSize},
     event::{
         ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta, VirtualKeyCode,
         WindowEvent,
@@ -31,6 +31,15 @@ pub struct AppState {
     pub window_dimensions: Dimensions,
     pub input: Input,
     pub delta_time: f64,
+}
+
+impl AppState {
+    pub fn window_center(&self) -> PhysicalPosition<i32> {
+        PhysicalPosition::new(
+            (self.window_dimensions.width as f32 / 2.0) as i32,
+            (self.window_dimensions.height as f32 / 2.0) as i32,
+        )
+    }
 }
 
 pub trait App {
@@ -116,11 +125,10 @@ pub fn run_app<T: 'static>(
                     let current_position = glm::vec2(position.x as _, position.y as _);
                     app_state.input.mouse.position = current_position;
                     app_state.input.mouse.position_delta = current_position - last_position;
+                    let center = app_state.window_center();
                     app_state.input.mouse.offset_from_center = glm::vec2(
-                        ((app_state.window_dimensions.width as f32 / 2.0) as i32
-                            - position.x as i32) as _,
-                        ((app_state.window_dimensions.height as f32 / 2.0) as i32
-                            - position.y as i32) as _,
+                        (center.x - position.x as i32) as _,
+                        (center.y - position.y as i32) as _,
                     );
                     cursor_moved = true;
                 }

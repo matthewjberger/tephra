@@ -35,7 +35,7 @@ impl FreeCamera {
             front: glm::vec3(0.0, 0.0, -1.0),
             up: glm::vec3(0.0, 0.0, 0.0),
             world_up: glm::vec3(0.0, 1.0, 0.0),
-            speed: 50.0,
+            speed: 20.0,
             sensitivity: 0.05,
             yaw_degrees: -90.0,
             pitch_degrees: 0.0,

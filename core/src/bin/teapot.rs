@@ -10,7 +10,7 @@ use support::{
         RenderPipeline, RenderPipelineSettings, Renderer, VulkanContext, VulkanSwapchain,
     },
 };
-use winit::{dpi::PhysicalPosition, window::Window};
+use winit::window::Window;
 
 fn main() {
     let (window, event_loop, renderer) = setup_app("Model");
@@ -64,10 +64,7 @@ impl App for DemoApp {
         self.camera.look_at(&glm::vec3(0.0, 0.0, 0.0));
 
         window
-            .set_cursor_position(PhysicalPosition::new(
-                (app_state.window_dimensions.width as f32 / 2.0) as i32,
-                (app_state.window_dimensions.height as f32 / 2.0) as i32,
-            ))
+            .set_cursor_position(app_state.window_center())
             .expect("Failed to set cursor position!");
     }
 
@@ -106,10 +103,7 @@ impl App for DemoApp {
         self.pipeline_data.uniform_buffer.upload_to_buffer(&ubos, 0);
 
         window
-            .set_cursor_position(PhysicalPosition::new(
-                (app_state.window_dimensions.width as f32 / 2.0) as i32,
-                (app_state.window_dimensions.height as f32 / 2.0) as i32,
-            ))
+            .set_cursor_position(app_state.window_center())
             .expect("Failed to set cursor position!");
     }
 
