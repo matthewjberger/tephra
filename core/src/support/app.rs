@@ -34,7 +34,7 @@ pub struct AppState {
 }
 
 pub trait App {
-    fn initialize(&mut self, _: &mut Window, _: &mut Renderer) {}
+    fn initialize(&mut self, _: &mut Window, _: &mut Renderer, _: &AppState) {}
     fn update(&mut self, _: &mut Window, _: &mut Renderer, _: &AppState) {}
     fn draw(&mut self, _: &mut Renderer, _: &AppState) {}
 }
@@ -71,7 +71,7 @@ pub fn run_app<T: 'static>(
 
     renderer.allocate_command_buffers();
 
-    app.initialize(&mut window, &mut renderer);
+    app.initialize(&mut window, &mut renderer, &app_state);
 
     let mut last_frame = Instant::now();
     let mut cursor_moved = false;

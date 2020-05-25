@@ -9,7 +9,7 @@ use winit::window::Window;
 struct DemoApp;
 
 impl App for DemoApp {
-    fn initialize(&mut self, _: &mut Window, renderer: &mut Renderer) {
+    fn initialize(&mut self, _: &mut Window, renderer: &mut Renderer, _: &AppState) {
         renderer.record_all_command_buffers(self as &mut dyn Command);
     }
 

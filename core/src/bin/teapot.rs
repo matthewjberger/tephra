@@ -10,7 +10,7 @@ use support::{
         VulkanSwapchain,
     },
 };
-use winit::{dpi::LogicalPosition, event::VirtualKeyCode, window::Window};
+use winit::{dpi::PhysicalPosition, event::VirtualKeyCode, window::Window};
 
 fn main() {
     let (window, event_loop, renderer) = setup_app("Triangle");
@@ -51,7 +51,7 @@ impl Drop for DemoApp {
 }
 
 impl App for DemoApp {
-    fn initialize(&mut self, window: &mut Window, renderer: &mut Renderer) {
+    fn initialize(&mut self, window: &mut Window, renderer: &mut Renderer, app_state: &AppState) {
         self.recreate_pipelines(renderer.context.clone(), renderer.vulkan_swapchain());
         renderer.record_all_command_buffers(self as &mut dyn Command);
 
@@ -62,6 +62,13 @@ impl App for DemoApp {
 
         self.camera.position_at(&glm::vec3(0.0, -4.0, -4.0));
         self.camera.look_at(&glm::vec3(0.0, 0.0, 0.0));
+
+        window
+            .set_cursor_position(PhysicalPosition::new(
+                (app_state.window_dimensions.width as f32 / 2.0) as i32,
+                (app_state.window_dimensions.height as f32 / 2.0) as i32,
+            ))
+            .expect("Failed to set cursor position!");
     }
 
     fn update(&mut self, window: &mut Window, renderer: &mut Renderer, app_state: &AppState) {
@@ -86,15 +93,7 @@ impl App for DemoApp {
         }
 
         let offset = app_state.input.mouse.offset_from_center;
-        self.camera
-            .process_mouse_movement(offset.x, -1.0 * offset.y);
-
-        window
-            .set_cursor_position(LogicalPosition::new(
-                (app_state.window_dimensions.width as f32 / 2.0) as i32,
-                (app_state.window_dimensions.height as f32 / 2.0) as i32,
-            ))
-            .expect("Failed to set cursor position!");
+        self.camera.process_mouse_movement(offset.x, offset.y);
 
         self.rotation += 0.05;
         if (self.rotation - 360.0) > 0.001 {
@@ -126,6 +125,13 @@ impl App for DemoApp {
         let ubos = [ubo];
 
         self.pipeline_data.uniform_buffer.upload_to_buffer(&ubos, 0);
+
+        window
+            .set_cursor_position(PhysicalPosition::new(
+                (app_state.window_dimensions.width as f32 / 2.0) as i32,
+                (app_state.window_dimensions.height as f32 / 2.0) as i32,
+            ))
+            .expect("Failed to set cursor position!");
     }
 
     fn draw(&mut self, renderer: &mut Renderer, app_state: &AppState) {
@@ -240,6 +246,7 @@ pub struct TrianglePipelineData {
     pub descriptor_pool: DescriptorPool,
     pub uniform_buffer: Buffer,
     pub descriptor_set: vk::DescriptorSet,
+    pub descriptor_set_layout: DescriptorSetLayout,
 }
 
 impl TrianglePipelineData {
@@ -260,6 +267,7 @@ impl TrianglePipelineData {
             descriptor_pool,
             uniform_buffer,
             descriptor_set,
+            descriptor_set_layout,
         };
 
         data.update_descriptor_set(context);

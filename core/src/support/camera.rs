@@ -75,7 +75,7 @@ impl FreeCamera {
         let (x_offset, y_offset) = (x_offset * self.sensitivity, y_offset * self.sensitivity);
 
         self.yaw_degrees -= x_offset;
-        self.pitch_degrees += y_offset;
+        self.pitch_degrees -= y_offset;
 
         let pitch_threshold = 89.0;
         if self.pitch_degrees > pitch_threshold {
