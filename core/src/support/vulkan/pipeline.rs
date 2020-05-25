@@ -4,48 +4,6 @@ use crate::vulkan::{
 use ash::{version::DeviceV1_0, vk};
 use std::{ffi::CString, sync::Arc};
 
-pub struct PipelineRenderer {
-    pub command_buffer: vk::CommandBuffer,
-    pub pipeline_layout: vk::PipelineLayout,
-    pub descriptor_set: vk::DescriptorSet,
-    pub vertex_buffer: vk::Buffer,
-    pub index_buffer: Option<vk::Buffer>,
-    pub dynamic_alignment: Option<u64>,
-}
-
-impl PipelineRenderer {
-    pub fn bind_geometry_buffers(&self, device: &ash::Device) {
-        let offsets = [0];
-        let vertex_buffers = [self.vertex_buffer];
-
-        unsafe {
-            device.cmd_bind_vertex_buffers(self.command_buffer, 0, &vertex_buffers, &offsets);
-
-            if let Some(index_buffer) = self.index_buffer {
-                device.cmd_bind_index_buffer(
-                    self.command_buffer,
-                    index_buffer,
-                    0,
-                    vk::IndexType::UINT32,
-                );
-            }
-        }
-    }
-
-    pub fn bind_descriptor_set(&self, device: &ash::Device) {
-        unsafe {
-            device.cmd_bind_descriptor_sets(
-                self.command_buffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                self.pipeline_layout,
-                0,
-                &[self.descriptor_set],
-                &[],
-            );
-        }
-    }
-}
-
 // TODO: Move shader paths into separate struct to be constructed with the builder pattern
 pub struct RenderPipelineSettings {
     pub vertex_state_info: vk::PipelineVertexInputStateCreateInfo,

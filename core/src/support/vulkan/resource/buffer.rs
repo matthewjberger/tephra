@@ -1,5 +1,5 @@
 use crate::vulkan::{CommandPool, VulkanContext};
-use ash::vk;
+use ash::{version::DeviceV1_0, vk};
 use std::sync::Arc;
 
 // TODO: Add snafu errors
@@ -117,6 +117,7 @@ impl Drop for Buffer {
 pub struct GeometryBuffer {
     pub vertex_buffer: Buffer,
     pub index_buffer: Option<Buffer>,
+    pub number_of_indices: u32,
 }
 
 impl GeometryBuffer {
@@ -124,7 +125,9 @@ impl GeometryBuffer {
         let vertex_buffer =
             Self::create_buffer(command_pool, &vertices, vk::BufferUsageFlags::VERTEX_BUFFER);
 
+        let mut number_of_indices = 0;
         let index_buffer = if let Some(indices) = indices {
+            number_of_indices = indices.len() as u32;
             let index_buffer =
                 Self::create_buffer(command_pool, &indices, vk::BufferUsageFlags::INDEX_BUFFER);
             Some(index_buffer)
@@ -135,6 +138,7 @@ impl GeometryBuffer {
         Self {
             vertex_buffer,
             index_buffer,
+            number_of_indices,
         }
     }
 
@@ -149,5 +153,23 @@ impl GeometryBuffer {
             size: (data.len() * std::mem::size_of::<T>()) as ash::vk::DeviceSize,
         };
         command_pool.create_device_local_buffer(usage_flags, &data, &[region])
+    }
+
+    pub fn bind(&self, device: &ash::Device, command_buffer: vk::CommandBuffer) {
+        let offsets = [0];
+        let vertex_buffers = [self.vertex_buffer.buffer()];
+
+        unsafe {
+            device.cmd_bind_vertex_buffers(command_buffer, 0, &vertex_buffers, &offsets);
+
+            if let Some(index_buffer) = self.index_buffer.as_ref() {
+                device.cmd_bind_index_buffer(
+                    command_buffer,
+                    index_buffer.buffer(),
+                    0,
+                    vk::IndexType::UINT32,
+                );
+            }
+        }
     }
 }

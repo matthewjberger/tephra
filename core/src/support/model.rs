@@ -3,7 +3,6 @@ use ash::vk;
 
 pub struct ObjModel {
     pub buffers: GeometryBuffer,
-    pub number_of_indices: u32,
 }
 
 impl ObjModel {
@@ -12,12 +11,8 @@ impl ObjModel {
             tobj::load_obj("core/assets/models/teapot.obj", false).expect("Failed to load file");
         let vertices = &models[0].mesh.positions;
         let indices = &models[0].mesh.indices;
-        let number_of_indices = indices.len() as u32;
         let buffers = GeometryBuffer::new(command_pool, vertices, Some(indices));
-        Self {
-            buffers,
-            number_of_indices,
-        }
+        Self { buffers }
     }
 
     pub fn create_vertex_attributes() -> [vk::VertexInputAttributeDescription; 1] {

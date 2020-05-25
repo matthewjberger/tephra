@@ -6,8 +6,8 @@ use support::{
     camera::FreeCamera,
     model::ObjModel,
     vulkan::{
-        Buffer, Command, CommandPool, DescriptorPool, DescriptorSetLayout, PipelineRenderer,
-        RenderPipeline, RenderPipelineSettings, Renderer, VulkanContext, VulkanSwapchain,
+        Buffer, Command, CommandPool, DescriptorPool, DescriptorSetLayout, RenderPipeline,
+        RenderPipelineSettings, Renderer, VulkanContext, VulkanSwapchain,
     },
 };
 use winit::window::Window;
@@ -122,29 +122,28 @@ impl Command for DemoApp {
     fn issue_commands(&mut self, device: &ash::Device, command_buffer: vk::CommandBuffer) {
         let pipeline = self.pipeline.as_ref().expect("Failed to get pipeline!");
 
-        let geometry_buffers = &self.model.buffers;
-
-        let pipeline_renderer = PipelineRenderer {
-            command_buffer,
-            pipeline_layout: pipeline.pipeline.layout(),
-            descriptor_set: self.pipeline_data.descriptor_set,
-            vertex_buffer: geometry_buffers.vertex_buffer.buffer(),
-            index_buffer: if let Some(index_buffer) = geometry_buffers.index_buffer.as_ref() {
-                Some(index_buffer.buffer())
-            } else {
-                None
-            },
-            dynamic_alignment: None,
-        };
-
-        pipeline_renderer.bind_geometry_buffers(device);
+        self.model.buffers.bind(device, command_buffer);
 
         pipeline.bind(device, command_buffer);
 
-        pipeline_renderer.bind_descriptor_set(device);
-
         unsafe {
-            device.cmd_draw_indexed(command_buffer, self.model.number_of_indices, 1, 0, 0, 1);
+            device.cmd_bind_descriptor_sets(
+                command_buffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                pipeline.pipeline.layout(),
+                0,
+                &[self.pipeline_data.descriptor_set],
+                &[],
+            );
+
+            device.cmd_draw_indexed(
+                command_buffer,
+                self.model.buffers.number_of_indices,
+                1,
+                0,
+                0,
+                1,
+            );
         }
     }
 
