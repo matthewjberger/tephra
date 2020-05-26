@@ -103,12 +103,24 @@ impl App for DemoApp {
             prefilter,
         };
 
-        let asset = GltfAsset::new(
-            self.context.clone(),
-            &renderer.transient_command_pool,
+        let asset_names = vec![
             "core/assets/models/DamagedHelmet.glb",
-        );
-        self.assets.push(asset);
+            "core/assets/models/CesiumMan.glb",
+            "core/assets/models/AlphaBlendModeTest.glb",
+        ];
+
+        let assets = asset_names
+            .iter()
+            .map(|name| {
+                GltfAsset::new(
+                    self.context.clone(),
+                    &renderer.transient_command_pool,
+                    &name,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        self.assets = assets;
 
         let number_of_meshes = self.assets.iter().fold(0, |total_meshes, asset| {
             total_meshes + asset.number_of_meshes
@@ -178,6 +190,15 @@ impl App for DemoApp {
         //     skybox_data.uniform_buffer.upload_to_buffer(&skybox_ubos, 0);
         // }
 
+        for asset in self.assets.iter_mut() {
+            for animation in asset.animations.iter_mut() {
+                animation.time += 0.75 * app_state.delta_time as f32;
+            }
+
+            // Only animate first animation
+            asset.animate(0);
+        }
+
         let mut ubo = UniformBufferObject {
             camera_position: glm::vec4(
                 self.camera.position.x,
@@ -190,6 +211,8 @@ impl App for DemoApp {
             joint_matrices: [glm::Mat4::identity(); UniformBufferObject::MAX_NUM_JOINTS],
         };
 
+        let spacing = glm::vec3(5.0, 0.0, 0.0);
+        let mut asset_transform = glm::Mat4::identity();
         let mut mesh_offset = 0;
         let mut joint_offset = 0;
         for asset in self.assets.iter() {
@@ -199,7 +222,7 @@ impl App for DemoApp {
                 if let Some(mesh) = graph[node_index].mesh.as_ref() {
                     if let Some(pbr_data) = &self.pbr_pipeline_data.as_ref() {
                         let mut dynamic_ubo = DynamicUniformBufferObject {
-                            model: global_transform,
+                            model: asset_transform * global_transform,
                             joint_info: glm::vec4(0.0, 0.0, 0.0, 0.0),
                         };
 
@@ -248,6 +271,7 @@ impl App for DemoApp {
                 }
             });
             mesh_offset += asset.number_of_meshes;
+            asset_transform = glm::translate(&asset_transform, &spacing)
         }
 
         let ubos = [ubo];
