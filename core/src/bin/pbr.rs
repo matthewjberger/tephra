@@ -105,6 +105,7 @@ impl App for DemoApp {
             "core/assets/models/DamagedHelmet.glb",
             "core/assets/models/CesiumMan.glb",
             "core/assets/models/AlphaBlendModeTest.glb",
+            "core/assets/models/MetalRoughSpheres.glb",
         ];
 
         let assets = asset_names
@@ -178,16 +179,6 @@ impl App for DemoApp {
             1000_f32,
         );
 
-        // if let Some(skybox_data) = &renderer.skybox_pipeline_data.as_ref() {
-        //     let skybox_ubo = SkyboxUniformBufferObject {
-        //         view: camera_state.view,
-        //         projection,
-        //     };
-        //     let skybox_ubos = [skybox_ubo];
-
-        //     skybox_data.uniform_buffer.upload_to_buffer(&skybox_ubos, 0);
-        // }
-
         for asset in self.assets.iter_mut() {
             for animation in asset.animations.iter_mut() {
                 animation.time += 0.75 * app_state.delta_time as f32;
@@ -209,7 +200,7 @@ impl App for DemoApp {
             joint_matrices: [glm::Mat4::identity(); UniformBufferObject::MAX_NUM_JOINTS],
         };
 
-        let spacing = glm::vec3(5.0, 0.0, 0.0);
+        let spacing = glm::vec3(20.0, 0.0, 0.0);
         let mut asset_transform = glm::Mat4::identity();
         let mut mesh_offset = 0;
         let mut joint_offset = 0;

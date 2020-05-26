@@ -2,8 +2,8 @@ use crate::{
     byte_slice_from,
     vulkan::{
         CommandPool, Cubemap, DescriptorPool, DescriptorSetLayout, Framebuffer, GraphicsPipeline,
-        ImageLayoutTransition, Offscreen, PipelineLayout, RenderPass, Shader, TextureBundle,
-        TextureDescription, UnitCube, VulkanContext,
+        ImageLayoutTransition, Offscreen, PipelineLayout, RenderPass, RenderPipeline,
+        RenderPipelineSettings, Shader, TextureBundle, TextureDescription, UnitCube, VulkanContext,
     },
 };
 use ash::{version::DeviceV1_0, vk};
@@ -57,17 +57,37 @@ impl HdrCubemap {
             output_cubemap.description.mip_levels,
         );
 
-        let descriptor_set_layout = Self::create_descriptor_set_layout(context.clone());
+        let descriptor_set_layout = Arc::new(Self::create_descriptor_set_layout(context.clone()));
         let descriptor_pool = Self::create_descriptor_pool(context.clone());
         let descriptor_set =
             descriptor_pool.allocate_descriptor_sets(descriptor_set_layout.layout(), 1)[0];
 
         Self::update_descriptor_set(context.clone(), descriptor_set, &hdr_texture_bundle);
 
-        let pipeline_layout =
-            Self::create_pipeline_layout(context.clone(), descriptor_set_layout.layout());
+        let push_constant_range = vk::PushConstantRange::builder()
+            .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
+            .size(std::mem::size_of::<PushBlockHdr>() as u32)
+            .build();
 
-        let pipeline = Self::create_pipeline(context.clone(), pipeline_layout, &render_pass);
+        let descriptions = UnitCube::vertex_input_descriptions();
+        let attributes = UnitCube::vertex_attributes();
+        let vertex_state_info = vk::PipelineVertexInputStateCreateInfo::builder()
+            .vertex_binding_descriptions(&descriptions)
+            .vertex_attribute_descriptions(&attributes)
+            .build();
+        let settings = RenderPipelineSettings {
+            render_pass: render_pass.render_pass(),
+            vertex_state_info,
+            descriptor_set_layout: descriptor_set_layout.clone(),
+            vertex_shader_path: "core/assets/shaders/environment/filtercube.vert.spv".to_string(),
+            fragment_shader_path:
+                "core/assets/shaders/environment/equirectangular_to_cubemap.frag.spv".to_string(),
+            blended: false,
+            depth_test_enabled: false,
+            push_constant_range: Some(push_constant_range),
+        };
+
+        let render_pipeline = RenderPipeline::new(context.clone(), settings);
 
         let clear_values = [vk::ClearValue {
             color: vk::ClearColorValue {
@@ -180,7 +200,7 @@ impl HdrCubemap {
 
                         device.cmd_push_constants(
                             command_buffer,
-                            pipeline.layout(),
+                            render_pipeline.pipeline.layout(),
                             vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                             0,
                             byte_slice_from(&push_block_hdr),
@@ -189,13 +209,13 @@ impl HdrCubemap {
                         device.cmd_bind_pipeline(
                             command_buffer,
                             vk::PipelineBindPoint::GRAPHICS,
-                            pipeline.pipeline(),
+                            render_pipeline.pipeline.pipeline(),
                         );
 
                         device.cmd_bind_descriptor_sets(
                             command_buffer,
                             vk::PipelineBindPoint::GRAPHICS,
-                            pipeline.layout(),
+                            render_pipeline.pipeline.layout(),
                             0,
                             &[descriptor_set],
                             &[],
@@ -398,147 +418,5 @@ impl HdrCubemap {
                 .logical_device()
                 .update_descriptor_sets(&descriptor_writes, &[])
         }
-    }
-
-    fn create_pipeline_layout(
-        context: Arc<VulkanContext>,
-        descriptor_set_layout: vk::DescriptorSetLayout,
-    ) -> PipelineLayout {
-        let descriptor_set_layouts = [descriptor_set_layout];
-
-        let push_constant_range = vk::PushConstantRange::builder()
-            .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
-            .size(std::mem::size_of::<PushBlockHdr>() as u32)
-            .build();
-        let push_constant_ranges = [push_constant_range];
-
-        let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::builder()
-            .set_layouts(&descriptor_set_layouts)
-            .push_constant_ranges(&push_constant_ranges)
-            .build();
-
-        PipelineLayout::new(context, pipeline_layout_create_info)
-    }
-
-    fn create_pipeline(
-        context: Arc<VulkanContext>,
-        pipeline_layout: PipelineLayout,
-        render_pass: &RenderPass,
-    ) -> GraphicsPipeline {
-        let input_assembly_create_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
-            .topology(vk::PrimitiveTopology::TRIANGLE_LIST)
-            .build();
-
-        let rasterizer_create_info = vk::PipelineRasterizationStateCreateInfo::builder()
-            .polygon_mode(vk::PolygonMode::FILL)
-            .cull_mode(vk::CullModeFlags::NONE)
-            .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-            .line_width(1.0)
-            .build();
-
-        let color_blend_attachment = vk::PipelineColorBlendAttachmentState::builder()
-            .color_write_mask(vk::ColorComponentFlags::all())
-            .blend_enable(false)
-            .build();
-        let color_blend_attachments = [color_blend_attachment];
-
-        let color_blend_state_info = vk::PipelineColorBlendStateCreateInfo::builder()
-            .attachments(&color_blend_attachments)
-            .build();
-
-        let back_stencil_op_state = vk::StencilOpState::builder()
-            .compare_op(vk::CompareOp::ALWAYS)
-            .build();
-        let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()
-            .depth_test_enable(false)
-            .depth_write_enable(false)
-            .depth_compare_op(vk::CompareOp::LESS_OR_EQUAL)
-            .front(Default::default())
-            .back(back_stencil_op_state)
-            .build();
-
-        let mut viewport_create_info = vk::PipelineViewportStateCreateInfo::default();
-        viewport_create_info.viewport_count = 1;
-        viewport_create_info.scissor_count = 1;
-
-        let multisampling_create_info = vk::PipelineMultisampleStateCreateInfo::builder()
-            .rasterization_samples(vk::SampleCountFlags::TYPE_1)
-            .build();
-
-        let dynamic_states = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
-        let dynamic_state_create_info = vk::PipelineDynamicStateCreateInfo::builder()
-            .flags(vk::PipelineDynamicStateCreateFlags::empty())
-            .dynamic_states(&dynamic_states)
-            .build();
-
-        let descriptions = Self::create_vertex_input_descriptions();
-        let attributes = Self::create_vertex_attributes();
-        let vertex_input_create_info = vk::PipelineVertexInputStateCreateInfo::builder()
-            .vertex_binding_descriptions(&descriptions)
-            .vertex_attribute_descriptions(&attributes)
-            .build();
-
-        let (vertex_shader, fragment_shader, _shader_entry_point_name) =
-            Self::create_shaders(context.clone());
-        let shader_state_info = [vertex_shader.state_info(), fragment_shader.state_info()];
-
-        let pipeline_create_info = vk::GraphicsPipelineCreateInfo::builder()
-            .stages(&shader_state_info)
-            .vertex_input_state(&vertex_input_create_info)
-            .input_assembly_state(&input_assembly_create_info)
-            .rasterization_state(&rasterizer_create_info)
-            .multisample_state(&multisampling_create_info)
-            .depth_stencil_state(&depth_stencil_info)
-            .color_blend_state(&color_blend_state_info)
-            .viewport_state(&viewport_create_info)
-            .dynamic_state(&dynamic_state_create_info)
-            .layout(pipeline_layout.layout())
-            .render_pass(render_pass.render_pass())
-            .subpass(0)
-            .build();
-
-        GraphicsPipeline::new(context, pipeline_create_info, pipeline_layout)
-    }
-
-    fn create_vertex_attributes() -> [vk::VertexInputAttributeDescription; 1] {
-        let position_description = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
-            .location(0)
-            .format(vk::Format::R32G32B32_SFLOAT)
-            .offset(0)
-            .build();
-        [position_description]
-    }
-
-    fn create_vertex_input_descriptions() -> [vk::VertexInputBindingDescription; 1] {
-        let vertex_input_binding_description = vk::VertexInputBindingDescription::builder()
-            .binding(0)
-            .stride((3 * std::mem::size_of::<f32>()) as _)
-            .input_rate(vk::VertexInputRate::VERTEX)
-            .build();
-        [vertex_input_binding_description]
-    }
-
-    fn create_shaders(context: Arc<VulkanContext>) -> (Shader, Shader, CString) {
-        let shader_entry_point_name =
-            CString::new("main").expect("Failed to create CString for shader entry point name!");
-
-        let vertex_shader = Shader::from_file(
-            context.clone(),
-            "core/assets/shaders/environment/filtercube.vert.spv",
-            vk::ShaderStageFlags::VERTEX,
-            &shader_entry_point_name,
-        )
-        .expect("Failed to create vertex shader!");
-
-        let fragment_shader = Shader::from_file(
-            context,
-            "core/assets/shaders/environment/equirectangular_to_cubemap.frag.spv",
-            vk::ShaderStageFlags::FRAGMENT,
-            &shader_entry_point_name,
-        )
-        .expect("Failed to create fragment shader!");
-
-        (vertex_shader, fragment_shader, shader_entry_point_name)
     }
 }

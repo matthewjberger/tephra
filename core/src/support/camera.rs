@@ -7,6 +7,8 @@ pub enum CameraDirection {
     Backward,
     Left,
     Right,
+    Up,
+    Down,
 }
 
 pub struct FreeCamera {
@@ -70,6 +72,8 @@ impl FreeCamera {
             CameraDirection::Backward => self.position -= self.front * velocity,
             CameraDirection::Left => self.position -= self.right * velocity,
             CameraDirection::Right => self.position += self.right * velocity,
+            CameraDirection::Up => self.position -= self.up * velocity,
+            CameraDirection::Down => self.position += self.up * velocity,
         };
     }
 
@@ -117,6 +121,14 @@ impl FreeCamera {
 
         if app_state.input.is_key_pressed(VirtualKeyCode::D) {
             self.translate(CameraDirection::Right, app_state.delta_time as f32);
+        }
+
+        if app_state.input.is_key_pressed(VirtualKeyCode::LShift) {
+            self.translate(CameraDirection::Down, app_state.delta_time as f32);
+        }
+
+        if app_state.input.is_key_pressed(VirtualKeyCode::Space) {
+            self.translate(CameraDirection::Up, app_state.delta_time as f32);
         }
 
         let offset = app_state.input.mouse.offset_from_center;
