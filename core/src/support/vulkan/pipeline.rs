@@ -1,6 +1,4 @@
-use crate::vulkan::{
-    DescriptorSetLayout, GraphicsPipeline, PipelineLayout, Shader, VulkanContext, VulkanSwapchain,
-};
+use crate::vulkan::{DescriptorSetLayout, GraphicsPipeline, PipelineLayout, Shader, VulkanContext};
 use ash::{version::DeviceV1_0, vk};
 use std::{ffi::CString, sync::Arc};
 
@@ -8,11 +6,13 @@ use std::{ffi::CString, sync::Arc};
 // TODO: Move shader paths into separate struct to be constructed with the builder pattern
 #[derive(Clone)]
 pub struct RenderPipelineSettings {
+    pub render_pass: vk::RenderPass,
     pub vertex_state_info: vk::PipelineVertexInputStateCreateInfo,
     pub descriptor_set_layout: Arc<DescriptorSetLayout>,
     pub vertex_shader_path: String,
     pub fragment_shader_path: String,
     pub blended: bool,
+    pub depth_test_enabled: bool,
     pub push_constant_range: Option<vk::PushConstantRange>,
 }
 
@@ -22,11 +22,7 @@ pub struct RenderPipeline {
 }
 
 impl RenderPipeline {
-    pub fn new(
-        context: Arc<VulkanContext>,
-        swapchain: &VulkanSwapchain,
-        settings: RenderPipelineSettings,
-    ) -> Self {
+    pub fn new(context: Arc<VulkanContext>, settings: RenderPipelineSettings) -> Self {
         let (vertex_shader, fragment_shader, _shader_entry_point_name) =
             Self::create_shaders(context.clone(), &settings);
         let shader_state_info = [vertex_shader.state_info(), fragment_shader.state_info()];
@@ -58,9 +54,9 @@ impl RenderPipeline {
             .build();
 
         let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()
-            .depth_test_enable(true)
-            .depth_write_enable(true)
-            .depth_compare_op(vk::CompareOp::LESS)
+            .depth_test_enable(settings.depth_test_enabled)
+            .depth_write_enable(settings.depth_test_enabled)
+            .depth_compare_op(vk::CompareOp::LESS_OR_EQUAL)
             .depth_bounds_test_enable(false)
             .min_depth_bounds(0.0)
             .max_depth_bounds(1.0)
@@ -105,7 +101,7 @@ impl RenderPipeline {
             .viewport_state(&viewport_create_info)
             .dynamic_state(&dynamic_state_create_info)
             .layout(pipeline_layout.layout())
-            .render_pass(swapchain.render_pass.render_pass())
+            .render_pass(settings.render_pass)
             .subpass(0)
             .build();
 

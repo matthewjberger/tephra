@@ -152,6 +152,7 @@ impl Command for DemoApp {
             .build();
 
         let settings = RenderPipelineSettings {
+            render_pass: swapchain.render_pass.render_pass(),
             vertex_state_info,
             descriptor_set_layout: Arc::new(ModelPipelineData::descriptor_set_layout(
                 context.clone(),
@@ -159,11 +160,12 @@ impl Command for DemoApp {
             vertex_shader_path: "core/assets/shaders/model/model.vert.spv".to_string(),
             fragment_shader_path: "core/assets/shaders/model/model.frag.spv".to_string(),
             blended: false,
+            depth_test_enabled: true,
             push_constant_range: None,
         };
 
         self.pipeline = None;
-        self.pipeline = Some(RenderPipeline::new(context, swapchain, settings));
+        self.pipeline = Some(RenderPipeline::new(context, settings));
     }
 }
 

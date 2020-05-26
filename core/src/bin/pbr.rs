@@ -27,7 +27,6 @@ fn main() {
 
 pub struct EnvironmentMapSet {
     brdflut: Brdflut,
-    hdr: HdrCubemap,
     irradiance: IrradianceMap,
     prefilter: PrefilterMap,
 }
@@ -98,7 +97,6 @@ impl App for DemoApp {
 
         let environment_maps = EnvironmentMapSet {
             brdflut,
-            hdr,
             irradiance,
             prefilter,
         };
@@ -394,6 +392,7 @@ impl Command for DemoApp {
             .build();
 
         let mut settings = RenderPipelineSettings {
+            render_pass: swapchain.render_pass.render_pass(),
             vertex_state_info,
             descriptor_set_layout: Arc::new(PbrPipelineData::descriptor_set_layout(
                 context.clone(),
@@ -401,18 +400,15 @@ impl Command for DemoApp {
             vertex_shader_path: "core/assets/shaders/pbr/pbr.vert.spv".to_string(),
             fragment_shader_path: "core/assets/shaders/pbr/pbr.frag.spv".to_string(),
             blended: false,
+            depth_test_enabled: true,
             push_constant_range: Some(push_constant_range),
         };
 
         self.pbr_pipeline = None;
         self.pbr_pipeline_blend = None;
-        self.pbr_pipeline = Some(RenderPipeline::new(
-            context.clone(),
-            swapchain,
-            settings.clone(),
-        ));
+        self.pbr_pipeline = Some(RenderPipeline::new(context.clone(), settings.clone()));
         settings.blended = true;
-        self.pbr_pipeline_blend = Some(RenderPipeline::new(context, swapchain, settings));
+        self.pbr_pipeline_blend = Some(RenderPipeline::new(context, settings));
     }
 }
 
