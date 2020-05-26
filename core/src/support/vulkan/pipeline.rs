@@ -6,9 +6,10 @@ use std::{ffi::CString, sync::Arc};
 
 // TODO: Add a builder for this struct
 // TODO: Move shader paths into separate struct to be constructed with the builder pattern
+#[derive(Clone)]
 pub struct RenderPipelineSettings {
     pub vertex_state_info: vk::PipelineVertexInputStateCreateInfo,
-    pub descriptor_set_layout: DescriptorSetLayout,
+    pub descriptor_set_layout: Arc<DescriptorSetLayout>,
     pub vertex_shader_path: String,
     pub fragment_shader_path: String,
     pub blended: bool,

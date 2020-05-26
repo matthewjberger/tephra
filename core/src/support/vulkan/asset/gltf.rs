@@ -1,4 +1,4 @@
-use crate::vulkan::{Renderer, TextureBundle, TextureDescription};
+use crate::vulkan::{CommandPool, TextureBundle, TextureDescription, VulkanContext};
 use ash::vk;
 use gltf::animation::{util::ReadOutputs, Interpolation};
 use nalgebra::{Matrix4, Quaternion, UnitQuaternion};
@@ -9,7 +9,7 @@ use petgraph::{
     prelude::*,
     visit::Dfs,
 };
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 #[derive(Debug)]
 pub enum TransformationSet {
@@ -126,7 +126,11 @@ pub struct GltfAsset {
 impl GltfAsset {
     pub const DEFAULT_NAME: &'static str = "<Unnamed>";
 
-    pub fn new(renderer: &Renderer, asset_name: &str) -> GltfAsset {
+    pub fn new(
+        context: Arc<VulkanContext>,
+        command_pool: &CommandPool,
+        asset_name: &str,
+    ) -> GltfAsset {
         let (gltf, buffers, asset_textures) =
             gltf::import(&asset_name).expect("Couldn't import file!");
 
@@ -134,17 +138,13 @@ impl GltfAsset {
             .iter()
             .map(|image_data| {
                 let description = TextureDescription::from_gltf(&image_data);
-                TextureBundle::new(
-                    renderer.context.clone(),
-                    &renderer.command_pool,
-                    &description,
-                )
+                TextureBundle::new(context.clone(), command_pool, &description)
             })
             .collect::<Vec<_>>();
 
         let animations = Self::prepare_animations(&gltf, &buffers);
 
-        let (mut scenes, vertices, indices) = Self::prepare_scenes(&gltf, &buffers, &renderer);
+        let (mut scenes, vertices, indices) = Self::prepare_scenes(&gltf, &buffers);
         Self::update_ubo_indices(&mut scenes);
 
         let number_of_meshes = gltf.nodes().filter(|node| node.mesh().is_some()).count();
@@ -173,7 +173,6 @@ impl GltfAsset {
     fn prepare_scenes(
         gltf: &gltf::Document,
         buffers: &[gltf::buffer::Data],
-        renderer: &Renderer,
     ) -> (Vec<Scene>, Vec<f32>, Vec<u32>) {
         let mut vertices = Vec::new();
         let mut indices = Vec::new();
@@ -187,7 +186,6 @@ impl GltfAsset {
                     &buffers,
                     &mut node_graph,
                     NodeIndex::new(0_usize),
-                    &renderer,
                     &mut vertices,
                     &mut indices,
                 );
@@ -234,7 +232,6 @@ impl GltfAsset {
         buffers: &[gltf::buffer::Data],
         node_graph: &mut NodeGraph,
         parent_index: NodeIndex,
-        renderer: &Renderer,
         vertices: &mut Vec<f32>,
         indices: &mut Vec<u32>,
     ) {
@@ -255,9 +252,7 @@ impl GltfAsset {
         }
 
         for child in node.children() {
-            Self::visit_children(
-                &child, buffers, node_graph, node_index, renderer, vertices, indices,
-            );
+            Self::visit_children(&child, buffers, node_graph, node_index, vertices, indices);
         }
     }
 

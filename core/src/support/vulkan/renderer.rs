@@ -7,6 +7,8 @@ use nalgebra_glm as glm;
 use std::sync::Arc;
 use winit::window::Window;
 
+// TODO: Device parameter can be removed because it will be accessible through the vulkan context
+// TODO: Rename this to something better
 pub trait Command {
     fn issue_commands(&mut self, _: &ash::Device, _: vk::CommandBuffer) {}
     fn recreate_pipelines(&mut self, _: Arc<VulkanContext>, _: &VulkanSwapchain) {}

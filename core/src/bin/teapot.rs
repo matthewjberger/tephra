@@ -14,7 +14,7 @@ use winit::window::Window;
 fn main() {
     let (window, event_loop, renderer) = setup_app("Model");
     run_app(
-        DemoApp::new(renderer.context.clone(), &renderer.command_pool),
+        DemoApp::new(renderer.context.clone(), &renderer.transient_command_pool),
         window,
         event_loop,
         renderer,
@@ -34,7 +34,7 @@ impl DemoApp {
     pub fn new(context: Arc<VulkanContext>, command_pool: &CommandPool) -> Self {
         Self {
             context: context.clone(),
-            model: ObjModel::new(&command_pool),
+            model: ObjModel::new(&command_pool, "core/assets/models/teapot.obj"),
             pipeline: None,
             pipeline_data: ModelPipelineData::new(context),
             rotation: 0.0,
@@ -153,7 +153,9 @@ impl Command for DemoApp {
 
         let settings = RenderPipelineSettings {
             vertex_state_info,
-            descriptor_set_layout: ModelPipelineData::descriptor_set_layout(context.clone()),
+            descriptor_set_layout: Arc::new(ModelPipelineData::descriptor_set_layout(
+                context.clone(),
+            )),
             vertex_shader_path: "core/assets/shaders/model/model.vert.spv".to_string(),
             fragment_shader_path: "core/assets/shaders/model/model.frag.spv".to_string(),
             blended: false,

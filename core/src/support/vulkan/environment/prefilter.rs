@@ -1,8 +1,8 @@
 use crate::{
     byte_slice_from,
     vulkan::{
-        CommandPool, Cubemap, DescriptorPool, DescriptorSetLayout, Framebuffer, GeometryBuffer,
-        GraphicsPipeline, ImageLayoutTransition, Offscreen, PipelineLayout, RenderPass, Shader,
+        CommandPool, Cubemap, DescriptorPool, DescriptorSetLayout, Framebuffer, GraphicsPipeline,
+        ImageLayoutTransition, Offscreen, PipelineLayout, RenderPass, Shader, UnitCube,
         VulkanContext,
     },
 };
@@ -22,12 +22,7 @@ pub struct PrefilterMap {
 }
 
 impl PrefilterMap {
-    pub fn new(
-        context: Arc<VulkanContext>,
-        command_pool: &CommandPool,
-        cubemap: &Cubemap,
-        cube: &GeometryBuffer,
-    ) -> Self {
+    pub fn new(context: Arc<VulkanContext>, command_pool: &CommandPool, cubemap: &Cubemap) -> Self {
         let dimension = 512;
         let format = vk::Format::R16G16B16A16_SFLOAT;
 
@@ -155,6 +150,8 @@ impl PrefilterMap {
         };
         let scissors = [scissor];
 
+        let unit_cube = UnitCube::new(command_pool);
+
         for mip_level in 0..output_cubemap.description.mip_levels {
             for (face, matrix) in matrices.iter().enumerate() {
                 let current_dimension = dimension as f32 * 0.5_f32.powf(mip_level as f32);
@@ -196,16 +193,6 @@ impl PrefilterMap {
                             pipeline.pipeline(),
                         );
 
-                        let offsets = [0];
-                        let vertex_buffers = [cube.vertex_buffer.buffer()];
-
-                        device.cmd_bind_vertex_buffers(
-                            command_buffer,
-                            0,
-                            &vertex_buffers,
-                            &offsets,
-                        );
-
                         device.cmd_bind_descriptor_sets(
                             command_buffer,
                             vk::PipelineBindPoint::GRAPHICS,
@@ -214,6 +201,8 @@ impl PrefilterMap {
                             &[descriptor_set],
                             &[],
                         );
+
+                        unit_cube.draw(device, command_buffer);
 
                         device.cmd_end_render_pass(command_buffer);
                     },
@@ -537,7 +526,7 @@ impl PrefilterMap {
 
         let vertex_shader = Shader::from_file(
             context.clone(),
-            "examples/assets/shaders/filtercube.vert.spv",
+            "core/assets/shaders/environment/filtercube.vert.spv",
             vk::ShaderStageFlags::VERTEX,
             &shader_entry_point_name,
         )
@@ -545,7 +534,7 @@ impl PrefilterMap {
 
         let fragment_shader = Shader::from_file(
             context,
-            "examples/assets/shaders/prefilterenvmap.frag.spv",
+            "core/assets/shaders/environment/prefilterenvmap.frag.spv",
             vk::ShaderStageFlags::FRAGMENT,
             &shader_entry_point_name,
         )

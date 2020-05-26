@@ -6,9 +6,8 @@ pub struct ObjModel {
 }
 
 impl ObjModel {
-    pub fn new(command_pool: &CommandPool) -> Self {
-        let (models, _) =
-            tobj::load_obj("core/assets/models/teapot.obj", false).expect("Failed to load file");
+    pub fn new(command_pool: &CommandPool, path: &str) -> Self {
+        let (models, _) = tobj::load_obj(path, false).expect("Failed to load file");
         let vertices = &models[0].mesh.positions;
         let indices = &models[0].mesh.indices;
         let buffers = GeometryBuffer::new(command_pool, vertices, Some(indices));

@@ -2,7 +2,7 @@ use crate::{
     byte_slice_from,
     vulkan::{
         CommandPool, Cubemap, DescriptorPool, DescriptorSetLayout, Framebuffer, GraphicsPipeline,
-        ImageLayoutTransition, ObjModel, Offscreen, PipelineLayout, RenderPass, Shader,
+        ImageLayoutTransition, Offscreen, PipelineLayout, RenderPass, Shader, UnitCube,
         VulkanContext,
     },
 };
@@ -22,12 +22,7 @@ pub struct IrradianceMap {
 }
 
 impl IrradianceMap {
-    pub fn new(
-        context: Arc<VulkanContext>,
-        command_pool: &CommandPool,
-        cubemap: &Cubemap,
-        model: &ObjModel,
-    ) -> Self {
+    pub fn new(context: Arc<VulkanContext>, command_pool: &CommandPool, cubemap: &Cubemap) -> Self {
         let dimension = 64;
         let format = vk::Format::R32G32B32A32_SFLOAT;
         let output_cubemap = Cubemap::new(context.clone(), dimension, format);
@@ -154,6 +149,8 @@ impl IrradianceMap {
         };
         let scissors = [scissor];
 
+        let unit_cube = UnitCube::new(command_pool);
+
         for mip_level in 0..output_cubemap.description.mip_levels {
             for (face, matrix) in matrices.iter().enumerate() {
                 let current_dimension = dimension as f32 * 0.5_f32.powf(mip_level as f32);
@@ -194,16 +191,6 @@ impl IrradianceMap {
                             pipeline.pipeline(),
                         );
 
-                        let offsets = [0];
-                        let vertex_buffers = [model.buffers.vertex_buffer.buffer()];
-
-                        device.cmd_bind_vertex_buffers(
-                            command_buffer,
-                            0,
-                            &vertex_buffers,
-                            &offsets,
-                        );
-
                         device.cmd_bind_descriptor_sets(
                             command_buffer,
                             vk::PipelineBindPoint::GRAPHICS,
@@ -213,14 +200,7 @@ impl IrradianceMap {
                             &[],
                         );
 
-                        device.cmd_draw_indexed(
-                            command_buffer,
-                            model.buffers.number_of_indices,
-                            1,
-                            0,
-                            0,
-                            1,
-                        );
+                        unit_cube.draw(device, command_buffer);
 
                         device.cmd_end_render_pass(command_buffer);
                     },
@@ -544,7 +524,7 @@ impl IrradianceMap {
 
         let vertex_shader = Shader::from_file(
             context.clone(),
-            "examples/assets/shaders/filtercube.vert.spv",
+            "core/assets/shaders/environment/filtercube.vert.spv",
             vk::ShaderStageFlags::VERTEX,
             &shader_entry_point_name,
         )
@@ -552,7 +532,7 @@ impl IrradianceMap {
 
         let fragment_shader = Shader::from_file(
             context,
-            "examples/assets/shaders/irradiancecube.frag.spv",
+            "core/assets/shaders/environment/irradiancecube.frag.spv",
             vk::ShaderStageFlags::FRAGMENT,
             &shader_entry_point_name,
         )
