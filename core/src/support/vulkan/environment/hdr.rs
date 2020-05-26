@@ -1,14 +1,14 @@
 use crate::{
     byte_slice_from,
     vulkan::{
-        CommandPool, Cubemap, DescriptorPool, DescriptorSetLayout, Framebuffer, GraphicsPipeline,
-        ImageLayoutTransition, Offscreen, PipelineLayout, RenderPass, RenderPipeline,
-        RenderPipelineSettings, Shader, TextureBundle, TextureDescription, UnitCube, VulkanContext,
+        CommandPool, Cubemap, DescriptorPool, DescriptorSetLayout, Framebuffer,
+        ImageLayoutTransition, Offscreen, RenderPass, RenderPipeline, RenderPipelineSettings,
+        TextureBundle, TextureDescription, UnitCube, VulkanContext,
     },
 };
 use ash::{version::DeviceV1_0, vk};
 use nalgebra_glm as glm;
-use std::{ffi::CString, sync::Arc};
+use std::sync::Arc;
 
 #[allow(dead_code)]
 struct PushBlockHdr {
@@ -64,21 +64,22 @@ impl HdrCubemap {
 
         Self::update_descriptor_set(context.clone(), descriptor_set, &hdr_texture_bundle);
 
-        let push_constant_range = vk::PushConstantRange::builder()
-            .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
-            .size(std::mem::size_of::<PushBlockHdr>() as u32)
-            .build();
-
         let descriptions = UnitCube::vertex_input_descriptions();
         let attributes = UnitCube::vertex_attributes();
         let vertex_state_info = vk::PipelineVertexInputStateCreateInfo::builder()
             .vertex_binding_descriptions(&descriptions)
             .vertex_attribute_descriptions(&attributes)
             .build();
+
+        let push_constant_range = vk::PushConstantRange::builder()
+            .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
+            .size(std::mem::size_of::<PushBlockHdr>() as u32)
+            .build();
+
         let settings = RenderPipelineSettings {
             render_pass: render_pass.render_pass(),
             vertex_state_info,
-            descriptor_set_layout: descriptor_set_layout.clone(),
+            descriptor_set_layout,
             vertex_shader_path: "core/assets/shaders/environment/filtercube.vert.spv".to_string(),
             fragment_shader_path:
                 "core/assets/shaders/environment/equirectangular_to_cubemap.frag.spv".to_string(),

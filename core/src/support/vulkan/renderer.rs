@@ -157,32 +157,6 @@ impl Renderer {
         self.record_all_command_buffers(command);
     }
 
-    pub fn update_viewport(&self, command_buffer: vk::CommandBuffer) {
-        let device = self.context.logical_device().logical_device();
-        let extent = self.vulkan_swapchain().swapchain.properties().extent;
-
-        let viewport = vk::Viewport {
-            x: 0.0,
-            y: 0.0,
-            width: extent.width as _,
-            height: extent.height as _,
-            min_depth: 0.0,
-            max_depth: 1.0,
-        };
-        let viewports = [viewport];
-
-        let scissor = vk::Rect2D {
-            offset: vk::Offset2D { x: 0, y: 0 },
-            extent,
-        };
-        let scissors = [scissor];
-
-        unsafe {
-            device.cmd_set_viewport(command_buffer, 0, &viewports);
-            device.cmd_set_scissor(command_buffer, 0, &scissors);
-        }
-    }
-
     fn record_single_command_buffer(
         &self,
         framebuffer: vk::Framebuffer,
@@ -232,7 +206,10 @@ impl Renderer {
             );
         }
 
-        self.update_viewport(command_buffer);
+        let extent = self.vulkan_swapchain().swapchain.properties().extent;
+        self.context
+            .logical_device()
+            .update_viewport(command_buffer, extent);
 
         command.issue_commands(device, command_buffer);
 
