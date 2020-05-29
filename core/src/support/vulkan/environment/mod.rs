@@ -1,7 +1,4 @@
-pub use self::{
-    brdflut::Brdflut, cube::UnitCube, hdr::HdrCubemap, irradiance::IrradianceMap,
-    offscreen::Offscreen, prefilter::PrefilterMap,
-};
+pub use self::{brdflut::*, cube::*, hdr::*, irradiance::*, offscreen::*, prefilter::*};
 
 pub mod brdflut;
 pub mod cube;

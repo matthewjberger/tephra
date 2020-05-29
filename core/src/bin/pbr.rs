@@ -1,7 +1,8 @@
 use ash::{version::DeviceV1_0, vk};
 use gltf::material::AlphaMode;
 use nalgebra_glm as glm;
-use std::{mem, sync::Arc};
+use snafu::{ResultExt, Snafu};
+use std::{boxed::Box, mem, sync::Arc};
 use support::{
     app::{run_app, setup_app, App, AppState},
     byte_slice_from,
@@ -9,11 +10,32 @@ use support::{
     vulkan::{
         Brdflut, Buffer, Command, CommandPool, DescriptorPool, DescriptorSetLayout, DummyImage,
         GeometryBuffer, GltfAsset, GraphicsPipeline, HdrCubemap, IrradianceMap, PrefilterMap,
-        Primitive, RenderPipeline, RenderPipelineSettings, Renderer, TextureBundle, VulkanContext,
-        VulkanSwapchain,
+        Primitive, RenderPipeline, RenderPipelineSettings, Renderer, ShaderSet, TextureBundle,
+        VulkanContext, VulkanSwapchain,
     },
 };
 use winit::window::Window;
+
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility = "pub(crate)")]
+pub enum Error {
+    #[snafu(display("Failed to create render pipeline: {}", source))]
+    CreateRenderPipeline {
+        source: support::vulkan::shader::Error,
+    },
+
+    #[snafu(display("Failed to create shader: {}", source))]
+    CreateShader {
+        source: support::vulkan::shader::Error,
+    },
+
+    #[snafu(display("Failed to create shader set: {}", source))]
+    CreateShaderSet {
+        source: support::vulkan::shader::Error,
+    },
+}
 
 fn main() {
     let (window, event_loop, renderer) = setup_app("Physically Based Rendering - Gltf models");
@@ -64,7 +86,12 @@ impl Drop for DemoApp {
 }
 
 impl App for DemoApp {
-    fn initialize(&mut self, window: &mut Window, renderer: &mut Renderer, app_state: &AppState) {
+    fn initialize(
+        &mut self,
+        window: &mut Window,
+        renderer: &mut Renderer,
+        app_state: &AppState,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         window.set_cursor_visible(false);
         window
             .set_cursor_grab(true)
@@ -86,13 +113,13 @@ impl App for DemoApp {
         let irradiance = IrradianceMap::new(
             self.context.clone(),
             &renderer.transient_command_pool,
-            &hdr.cubemap,
+            &hdr.as_ref().expect("Failed to get hdr cubemap!").cubemap,
         );
 
         let prefilter = PrefilterMap::new(
             self.context.clone(),
             &renderer.transient_command_pool,
-            &hdr.cubemap,
+            &hdr.as_ref().expect("Failed to lookup hdr cubemap!").cubemap,
         );
 
         let environment_maps = EnvironmentMapSet {
@@ -160,12 +187,19 @@ impl App for DemoApp {
 
         self.environment_maps = Some(environment_maps);
 
-        self.recreate_pipelines(renderer.context.clone(), renderer.vulkan_swapchain());
+        self.recreate_pipelines(renderer.context.clone(), renderer.vulkan_swapchain())?;
 
         renderer.record_all_command_buffers(self as &mut dyn Command);
+
+        Ok(())
     }
 
-    fn update(&mut self, window: &mut Window, renderer: &mut Renderer, app_state: &AppState) {
+    fn update(
+        &mut self,
+        window: &mut Window,
+        renderer: &mut Renderer,
+        app_state: &AppState,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.camera.update(&app_state);
 
         let projection = glm::perspective_zo(
@@ -271,18 +305,30 @@ impl App for DemoApp {
         window
             .set_cursor_position(app_state.window_center())
             .expect("Failed to set cursor position!");
+
+        Ok(())
     }
 
-    fn draw(&mut self, renderer: &mut Renderer, app_state: &AppState) {
+    fn draw(
+        &mut self,
+        renderer: &mut Renderer,
+        app_state: &AppState,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         renderer.render(
             app_state.window_dimensions.as_vec2(),
             self as &mut dyn Command,
         );
+
+        Ok(())
     }
 }
 
 impl Command for DemoApp {
-    fn issue_commands(&mut self, device: &ash::Device, command_buffer: vk::CommandBuffer) {
+    fn issue_commands(
+        &mut self,
+        device: &ash::Device,
+        command_buffer: vk::CommandBuffer,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let pbr_pipeline = self
             .pbr_pipeline
             .as_ref()
@@ -334,42 +380,29 @@ impl Command for DemoApp {
                     _ => {}
                 }
 
-                // TODO: Group these offsets into a struct
-                let mut texture_offset = 0;
-                let mut index_offset = 0;
-                let mut vertex_offset = 0;
-                let mut mesh_offset = 0;
+                let mut offsets = GltfOffsets::default();
                 for asset in self.assets.iter() {
                     if *alpha_mode == AlphaMode::Blend {
-                        pbr_renderer_blended.draw_asset(
-                            device,
-                            &asset,
-                            texture_offset,
-                            mesh_offset,
-                            index_offset,
-                            vertex_offset,
-                            *alpha_mode,
-                        );
+                        pbr_renderer_blended.draw_asset(device, &asset, &offsets, *alpha_mode);
                     } else {
-                        pbr_renderer.draw_asset(
-                            device,
-                            &asset,
-                            texture_offset,
-                            mesh_offset,
-                            index_offset,
-                            vertex_offset,
-                            *alpha_mode,
-                        );
+                        pbr_renderer.draw_asset(device, &asset, &offsets, *alpha_mode);
                     }
-                    texture_offset += asset.textures.len() as i32;
-                    mesh_offset += asset.number_of_meshes;
-                    index_offset += asset.indices.len() as u32;
-                    vertex_offset += (asset.vertices.len() / GltfAsset::vertex_stride()) as u32;
+                    offsets.texture_offset += asset.textures.len() as i32;
+                    offsets.mesh_offset += asset.number_of_meshes;
+                    offsets.index_offset += asset.indices.len() as u32;
+                    offsets.vertex_offset +=
+                        (asset.vertices.len() / GltfAsset::vertex_stride()) as u32;
                 }
             });
+
+        Ok(())
     }
 
-    fn recreate_pipelines(&mut self, context: Arc<VulkanContext>, swapchain: &VulkanSwapchain) {
+    fn recreate_pipelines(
+        &mut self,
+        context: Arc<VulkanContext>,
+        swapchain: &VulkanSwapchain,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let descriptions = GltfAsset::create_vertex_input_descriptions();
         let attributes = GltfAsset::create_vertex_attributes();
         let vertex_state_info = vk::PipelineVertexInputStateCreateInfo::builder()
@@ -382,24 +415,33 @@ impl Command for DemoApp {
             .size(mem::size_of::<PushConstantBlockMaterial>() as u32)
             .build();
 
-        let mut settings = RenderPipelineSettings {
-            render_pass: swapchain.render_pass.render_pass(),
+        let shader_set = Arc::new(
+            ShaderSet::new(context.clone())
+                .context(CreateShaderSet {})?
+                .vertex_shader("core/assets/shaders/pbr/pbr.vert.spv")
+                .context(CreateShader {})?
+                .fragment_shader("core/assets/shaders/pbr/pbr.frag.spv")
+                .context(CreateShader {})?,
+        );
+
+        let descriptor_set_layout =
+            Arc::new(PbrPipelineData::descriptor_set_layout(context.clone()));
+
+        let mut settings = RenderPipelineSettings::new(
+            swapchain.render_pass.render_pass(),
             vertex_state_info,
-            descriptor_set_layout: Arc::new(PbrPipelineData::descriptor_set_layout(
-                context.clone(),
-            )),
-            vertex_shader_path: "core/assets/shaders/pbr/pbr.vert.spv".to_string(),
-            fragment_shader_path: "core/assets/shaders/pbr/pbr.frag.spv".to_string(),
-            blended: false,
-            depth_test_enabled: true,
-            push_constant_range: Some(push_constant_range),
-        };
+            descriptor_set_layout,
+            shader_set,
+        )
+        .push_constant_range(push_constant_range);
 
         self.pbr_pipeline = None;
         self.pbr_pipeline_blend = None;
         self.pbr_pipeline = Some(RenderPipeline::new(context.clone(), settings.clone()));
         settings.blended = true;
         self.pbr_pipeline_blend = Some(RenderPipeline::new(context, settings));
+
+        Ok(())
     }
 }
 
@@ -745,6 +787,14 @@ impl PbrPipelineData {
     }
 }
 
+#[derive(Default)]
+pub struct GltfOffsets {
+    pub texture_offset: i32,
+    pub mesh_offset: usize,
+    pub index_offset: u32,
+    pub vertex_offset: u32,
+}
+
 pub struct PbrRenderer {
     command_buffer: vk::CommandBuffer,
     pipeline_layout: vk::PipelineLayout,
@@ -770,10 +820,7 @@ impl PbrRenderer {
         &self,
         device: &ash::Device,
         asset: &GltfAsset,
-        texture_offset: i32,
-        mesh_offset: usize,
-        index_offset: u32,
-        vertex_offset: u32,
+        offsets: &GltfOffsets,
         alpha_mode: AlphaMode,
     ) {
         asset.walk(|node_index, graph| {
@@ -785,7 +832,10 @@ impl PbrRenderer {
                         self.pipeline_layout,
                         0,
                         &[self.descriptor_set],
-                        &[((mesh_offset + mesh.mesh_id) as u64 * self.dynamic_alignment) as _],
+                        &[
+                            ((offsets.mesh_offset + mesh.mesh_id) as u64 * self.dynamic_alignment)
+                                as _,
+                        ],
                     );
                 }
 
@@ -804,7 +854,8 @@ impl PbrRenderer {
                         continue;
                     }
 
-                    let material = Self::create_material(&asset, &primitive, texture_offset);
+                    let material =
+                        Self::create_material(&asset, &primitive, offsets.texture_offset);
                     unsafe {
                         device.cmd_push_constants(
                             self.command_buffer,
@@ -818,8 +869,8 @@ impl PbrRenderer {
                             self.command_buffer,
                             primitive.number_of_indices,
                             1,
-                            index_offset + primitive.first_index,
-                            vertex_offset as _,
+                            offsets.index_offset + primitive.first_index,
+                            offsets.vertex_offset as _,
                             0,
                         );
                     }

@@ -1,6 +1,8 @@
-use crate::vulkan::{DescriptorSetLayout, GraphicsPipeline, PipelineLayout, Shader, VulkanContext};
+use crate::vulkan::{
+    DescriptorSetLayout, GraphicsPipeline, PipelineLayout, ShaderSet, VulkanContext,
+};
 use ash::{version::DeviceV1_0, vk};
-use std::{ffi::CString, sync::Arc};
+use std::sync::Arc;
 
 // TODO: Add a builder for this struct
 // TODO: Move shader paths into separate struct to be constructed with the builder pattern
@@ -9,11 +11,44 @@ pub struct RenderPipelineSettings {
     pub render_pass: vk::RenderPass,
     pub vertex_state_info: vk::PipelineVertexInputStateCreateInfo,
     pub descriptor_set_layout: Arc<DescriptorSetLayout>,
-    pub vertex_shader_path: String,
-    pub fragment_shader_path: String,
     pub blended: bool,
     pub depth_test_enabled: bool,
     pub push_constant_range: Option<vk::PushConstantRange>,
+    pub shader_set: Arc<ShaderSet>,
+}
+
+impl RenderPipelineSettings {
+    pub fn new(
+        render_pass: vk::RenderPass,
+        vertex_state_info: vk::PipelineVertexInputStateCreateInfo,
+        descriptor_set_layout: Arc<DescriptorSetLayout>,
+        shader_set: Arc<ShaderSet>,
+    ) -> Self {
+        Self {
+            render_pass,
+            vertex_state_info,
+            descriptor_set_layout,
+            shader_set,
+            blended: false,
+            depth_test_enabled: true,
+            push_constant_range: None,
+        }
+    }
+
+    pub fn blended(mut self, blended: bool) -> Self {
+        self.blended = blended;
+        self
+    }
+
+    pub fn depth_test_enabled(mut self, depth_test_enabled: bool) -> Self {
+        self.depth_test_enabled = depth_test_enabled;
+        self
+    }
+
+    pub fn push_constant_range(mut self, push_constant_range: vk::PushConstantRange) -> Self {
+        self.push_constant_range = Some(push_constant_range);
+        self
+    }
 }
 
 pub struct RenderPipeline {
@@ -23,9 +58,20 @@ pub struct RenderPipeline {
 
 impl RenderPipeline {
     pub fn new(context: Arc<VulkanContext>, settings: RenderPipelineSettings) -> Self {
-        let (vertex_shader, fragment_shader, _shader_entry_point_name) =
-            Self::create_shaders(context.clone(), &settings);
-        let shader_state_info = [vertex_shader.state_info(), fragment_shader.state_info()];
+        let shader_state_info = [
+            settings
+                .shader_set
+                .vertex_shader
+                .as_ref()
+                .expect("Failed to lookup vertex shader!")
+                .state_info(),
+            settings
+                .shader_set
+                .fragment_shader
+                .as_ref()
+                .expect("Failed to lookup fragment shader!")
+                .state_info(),
+        ];
 
         let input_assembly_create_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
             .topology(vk::PrimitiveTopology::TRIANGLE_LIST)
@@ -108,32 +154,6 @@ impl RenderPipeline {
         let pipeline = GraphicsPipeline::new(context, pipeline_create_info, pipeline_layout);
 
         Self { pipeline, settings }
-    }
-
-    fn create_shaders(
-        context: Arc<VulkanContext>,
-        settings: &RenderPipelineSettings,
-    ) -> (Shader, Shader, CString) {
-        let shader_entry_point_name =
-            CString::new("main").expect("Failed to create CString for shader entry point name!");
-
-        let vertex_shader = Shader::from_file(
-            context.clone(),
-            &settings.vertex_shader_path,
-            vk::ShaderStageFlags::VERTEX,
-            &shader_entry_point_name,
-        )
-        .expect("Failed to create vertex shader!");
-
-        let fragment_shader = Shader::from_file(
-            context,
-            &settings.fragment_shader_path,
-            vk::ShaderStageFlags::FRAGMENT,
-            &shader_entry_point_name,
-        )
-        .expect("Failed to create fragment shader!");
-
-        (vertex_shader, fragment_shader, shader_entry_point_name)
     }
 
     pub fn create_color_blend_attachments_opaque() -> [vk::PipelineColorBlendAttachmentState; 1] {

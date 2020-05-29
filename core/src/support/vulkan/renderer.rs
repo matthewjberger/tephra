@@ -4,14 +4,27 @@ use crate::vulkan::{
 };
 use ash::{version::DeviceV1_0, vk};
 use nalgebra_glm as glm;
-use std::sync::Arc;
+use std::{boxed::Box, error::Error, sync::Arc};
 use winit::window::Window;
 
 // TODO: Device parameter can be removed because it will be accessible through the vulkan context
 // TODO: Rename this to something better
 pub trait Command {
-    fn issue_commands(&mut self, _: &ash::Device, _: vk::CommandBuffer) {}
-    fn recreate_pipelines(&mut self, _: Arc<VulkanContext>, _: &VulkanSwapchain) {}
+    fn issue_commands(
+        &mut self,
+        _: &ash::Device,
+        _: vk::CommandBuffer,
+    ) -> Result<(), Box<dyn Error>> {
+        Ok(())
+    }
+
+    fn recreate_pipelines(
+        &mut self,
+        _: Arc<VulkanContext>,
+        _: &VulkanSwapchain,
+    ) -> Result<(), Box<dyn Error>> {
+        Ok(())
+    }
 }
 
 pub struct Renderer {
@@ -153,7 +166,9 @@ impl Renderer {
         );
         self.vulkan_swapchain = Some(new_swapchain);
 
-        command.recreate_pipelines(self.context.clone(), self.vulkan_swapchain());
+        command
+            .recreate_pipelines(self.context.clone(), self.vulkan_swapchain())
+            .expect("Failed to recreate pipelines!");
         self.record_all_command_buffers(command);
     }
 
@@ -211,7 +226,9 @@ impl Renderer {
             .logical_device()
             .update_viewport(command_buffer, extent);
 
-        command.issue_commands(device, command_buffer);
+        command
+            .issue_commands(device, command_buffer)
+            .expect("Failed to issue vulkan commands!");
 
         unsafe {
             self.context

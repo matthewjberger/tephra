@@ -3,7 +3,7 @@ use crate::{
     vulkan::{Renderer, VulkanContext},
 };
 use nalgebra_glm as glm;
-use std::{sync::Arc, time::Instant};
+use std::{boxed::Box, error::Error, sync::Arc, time::Instant};
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
     event::{
@@ -47,9 +47,27 @@ impl AppState {
 }
 
 pub trait App {
-    fn initialize(&mut self, _: &mut Window, _: &mut Renderer, _: &AppState) {}
-    fn update(&mut self, _: &mut Window, _: &mut Renderer, _: &AppState) {}
-    fn draw(&mut self, _: &mut Renderer, _: &AppState) {}
+    fn initialize(
+        &mut self,
+        _: &mut Window,
+        _: &mut Renderer,
+        _: &AppState,
+    ) -> Result<(), Box<dyn Error>> {
+        Ok(())
+    }
+
+    fn update(
+        &mut self,
+        _: &mut Window,
+        _: &mut Renderer,
+        _: &AppState,
+    ) -> Result<(), Box<dyn Error>> {
+        Ok(())
+    }
+
+    fn draw(&mut self, _: &mut Renderer, _: &AppState) -> Result<(), Box<dyn Error>> {
+        Ok(())
+    }
 }
 
 pub fn setup_app(title: &str) -> (Window, EventLoop<()>, Renderer) {
@@ -84,7 +102,8 @@ pub fn run_app<T: 'static>(
 
     renderer.allocate_command_buffers();
 
-    app.initialize(&mut window, &mut renderer, &app_state);
+    app.initialize(&mut window, &mut renderer, &app_state)
+        .expect("Failed to initialize app!");
 
     let mut last_frame = Instant::now();
     let mut cursor_moved = false;
@@ -95,7 +114,8 @@ pub fn run_app<T: 'static>(
                 app_state.delta_time =
                     (Instant::now().duration_since(last_frame).as_micros() as f64) / 1_000_000_f64;
                 last_frame = Instant::now();
-                app.update(&mut window, &mut renderer, &app_state);
+                app.update(&mut window, &mut renderer, &app_state)
+                    .expect("Failed to update app!");
             }
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
@@ -153,7 +173,8 @@ pub fn run_app<T: 'static>(
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
-                app.draw(&mut renderer, &app_state);
+                app.draw(&mut renderer, &app_state)
+                    .expect("Failed to draw app!");
             }
             Event::RedrawEventsCleared => {
                 app_state.input.mouse.wheel_delta = 0.0;

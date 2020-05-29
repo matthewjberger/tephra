@@ -1,15 +1,38 @@
 use ash::{version::DeviceV1_0, vk};
 use nalgebra_glm as glm;
-use std::{mem, sync::Arc};
+use snafu::{ResultExt, Snafu};
+use std::{boxed::Box, mem, sync::Arc};
 use support::{
     app::{run_app, setup_app, App, AppState},
     camera::FreeCamera,
     vulkan::{
         Buffer, Command, CommandPool, DescriptorPool, DescriptorSetLayout, ObjModel,
-        RenderPipeline, RenderPipelineSettings, Renderer, VulkanContext, VulkanSwapchain,
+        RenderPipeline, RenderPipelineSettings, Renderer, ShaderSet, VulkanContext,
+        VulkanSwapchain,
     },
 };
 use winit::window::Window;
+
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility = "pub(crate)")]
+pub enum Error {
+    #[snafu(display("Failed to create render pipeline: {}", source))]
+    CreateRenderPipeline {
+        source: support::vulkan::shader::Error,
+    },
+
+    #[snafu(display("Failed to create shader: {}", source))]
+    CreateShader {
+        source: support::vulkan::shader::Error,
+    },
+
+    #[snafu(display("Failed to create shader set: {}", source))]
+    CreateShaderSet {
+        source: support::vulkan::shader::Error,
+    },
+}
 
 fn main() {
     let (window, event_loop, renderer) = setup_app("Model");
@@ -50,8 +73,13 @@ impl Drop for DemoApp {
 }
 
 impl App for DemoApp {
-    fn initialize(&mut self, window: &mut Window, renderer: &mut Renderer, app_state: &AppState) {
-        self.recreate_pipelines(renderer.context.clone(), renderer.vulkan_swapchain());
+    fn initialize(
+        &mut self,
+        window: &mut Window,
+        renderer: &mut Renderer,
+        app_state: &AppState,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.recreate_pipelines(renderer.context.clone(), renderer.vulkan_swapchain())?;
         renderer.record_all_command_buffers(self as &mut dyn Command);
 
         window.set_cursor_visible(false);
@@ -65,9 +93,16 @@ impl App for DemoApp {
         window
             .set_cursor_position(app_state.window_center())
             .expect("Failed to set cursor position!");
+
+        Ok(())
     }
 
-    fn update(&mut self, window: &mut Window, renderer: &mut Renderer, app_state: &AppState) {
+    fn update(
+        &mut self,
+        window: &mut Window,
+        renderer: &mut Renderer,
+        app_state: &AppState,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.camera.update(&app_state);
 
         self.rotation += 0.05;
@@ -104,18 +139,30 @@ impl App for DemoApp {
         window
             .set_cursor_position(app_state.window_center())
             .expect("Failed to set cursor position!");
+
+        Ok(())
     }
 
-    fn draw(&mut self, renderer: &mut Renderer, app_state: &AppState) {
+    fn draw(
+        &mut self,
+        renderer: &mut Renderer,
+        app_state: &AppState,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         renderer.render(
             app_state.window_dimensions.as_vec2(),
             self as &mut dyn Command,
         );
+
+        Ok(())
     }
 }
 
 impl Command for DemoApp {
-    fn issue_commands(&mut self, device: &ash::Device, command_buffer: vk::CommandBuffer) {
+    fn issue_commands(
+        &mut self,
+        device: &ash::Device,
+        command_buffer: vk::CommandBuffer,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let pipeline = self.pipeline.as_ref().expect("Failed to get pipeline!");
 
         self.model.buffers.bind(device, command_buffer);
@@ -141,9 +188,15 @@ impl Command for DemoApp {
                 1,
             );
         }
+
+        Ok(())
     }
 
-    fn recreate_pipelines(&mut self, context: Arc<VulkanContext>, swapchain: &VulkanSwapchain) {
+    fn recreate_pipelines(
+        &mut self,
+        context: Arc<VulkanContext>,
+        swapchain: &VulkanSwapchain,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let descriptions = ObjModel::create_vertex_input_descriptions();
         let attributes = ObjModel::create_vertex_attributes();
         let vertex_state_info = vk::PipelineVertexInputStateCreateInfo::builder()
@@ -151,21 +204,29 @@ impl Command for DemoApp {
             .vertex_attribute_descriptions(&attributes)
             .build();
 
-        let settings = RenderPipelineSettings {
-            render_pass: swapchain.render_pass.render_pass(),
+        let shader_set = Arc::new(
+            ShaderSet::new(context.clone())
+                .context(CreateShaderSet {})?
+                .vertex_shader("core/assets/shaders/model/model.vert.spv")
+                .context(CreateShader {})?
+                .fragment_shader("core/assets/shaders/model/model.frag.spv")
+                .context(CreateShader {})?,
+        );
+
+        let descriptor_set_layout =
+            Arc::new(ModelPipelineData::descriptor_set_layout(context.clone()));
+
+        let settings = RenderPipelineSettings::new(
+            swapchain.render_pass.render_pass(),
             vertex_state_info,
-            descriptor_set_layout: Arc::new(ModelPipelineData::descriptor_set_layout(
-                context.clone(),
-            )),
-            vertex_shader_path: "core/assets/shaders/model/model.vert.spv".to_string(),
-            fragment_shader_path: "core/assets/shaders/model/model.frag.spv".to_string(),
-            blended: false,
-            depth_test_enabled: true,
-            push_constant_range: None,
-        };
+            descriptor_set_layout,
+            shader_set,
+        );
 
         self.pipeline = None;
         self.pipeline = Some(RenderPipeline::new(context, settings));
+
+        Ok(())
     }
 }
 

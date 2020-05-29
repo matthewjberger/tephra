@@ -3,12 +3,34 @@ use crate::{
     vulkan::{
         CommandPool, Cubemap, DescriptorPool, DescriptorSetLayout, Framebuffer,
         ImageLayoutTransition, Offscreen, RenderPass, RenderPipeline, RenderPipelineSettings,
-        TextureBundle, TextureDescription, UnitCube, VulkanContext,
+        ShaderSet, TextureBundle, TextureDescription, UnitCube, VulkanContext,
     },
 };
 use ash::{version::DeviceV1_0, vk};
 use nalgebra_glm as glm;
+use snafu::{ResultExt, Snafu};
 use std::sync::Arc;
+
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility = "pub(crate)")]
+pub enum Error {
+    #[snafu(display("Failed to create render pipeline: {}", source))]
+    CreateRenderPipeline {
+        source: crate::vulkan::shader::Error,
+    },
+
+    #[snafu(display("Failed to create shader: {}", source))]
+    CreateShader {
+        source: crate::vulkan::shader::Error,
+    },
+
+    #[snafu(display("Failed to create shader set: {}", source))]
+    CreateShaderSet {
+        source: crate::vulkan::shader::Error,
+    },
+}
 
 #[allow(dead_code)]
 struct PushBlockHdr {
@@ -20,7 +42,11 @@ pub struct HdrCubemap {
 }
 
 impl HdrCubemap {
-    pub fn new(context: Arc<VulkanContext>, command_pool: &CommandPool, path: &str) -> Self {
+    pub fn new(
+        context: Arc<VulkanContext>,
+        command_pool: &CommandPool,
+        path: &str,
+    ) -> Result<Self> {
         let description = TextureDescription::from_hdr(path);
         let hdr_texture_bundle = TextureBundle::new(context.clone(), &command_pool, &description);
 
@@ -76,17 +102,25 @@ impl HdrCubemap {
             .size(std::mem::size_of::<PushBlockHdr>() as u32)
             .build();
 
-        let settings = RenderPipelineSettings {
-            render_pass: render_pass.render_pass(),
+        let shader_set = Arc::new(
+            ShaderSet::new(context.clone())
+                .context(CreateShaderSet {})?
+                .vertex_shader("core/assets/shaders/environment/filtercube.vert.spv")
+                .context(CreateShader {})?
+                .fragment_shader(
+                    "core/assets/shaders/environment/equirectangular_to_cubemap.frag.spv",
+                )
+                .context(CreateShader {})?,
+        );
+
+        let settings = RenderPipelineSettings::new(
+            render_pass.render_pass(),
             vertex_state_info,
             descriptor_set_layout,
-            vertex_shader_path: "core/assets/shaders/environment/filtercube.vert.spv".to_string(),
-            fragment_shader_path:
-                "core/assets/shaders/environment/equirectangular_to_cubemap.frag.spv".to_string(),
-            blended: false,
-            depth_test_enabled: false,
-            push_constant_range: Some(push_constant_range),
-        };
+            shader_set,
+        )
+        .depth_test_enabled(true)
+        .push_constant_range(push_constant_range);
 
         let render_pipeline = RenderPipeline::new(context.clone(), settings);
 
@@ -297,9 +331,11 @@ impl HdrCubemap {
 
         output_cubemap.transition(&command_pool, &transition);
 
-        Self {
+        let hdr = Self {
             cubemap: output_cubemap,
-        }
+        };
+
+        Ok(hdr)
     }
 
     fn create_render_pass(context: Arc<VulkanContext>, format: vk::Format) -> RenderPass {
