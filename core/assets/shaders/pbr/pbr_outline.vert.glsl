@@ -25,11 +25,6 @@ layout(binding = 1) uniform UboInstance {
   float outlineWidth;
 } uboInstance;
 
-layout (location = 0) out vec3 outWorldPos;
-layout (location = 1) out vec3 outNormal;
-layout (location = 2) out vec2 outUV0;
-layout (location = 3) out vec2 outUV1;
-
 void main()
 {
   mat4 skinMatrix = mat4(1.0);
@@ -40,11 +35,7 @@ void main()
       inWeight0.z * uboView.jointMatrices[int(inJoint0.z + uboInstance.jointOffset)] +
       inWeight0.w * uboView.jointMatrices[int(inJoint0.w + uboInstance.jointOffset)];
   }
-  vec4 locPos = uboInstance.model * skinMatrix * vec4(inPos.xyz, 1.0);
-  outNormal = normalize(transpose(inverse(mat3(uboInstance.model * skinMatrix))) * inNormal);
+  vec4 locPos = uboInstance.model * skinMatrix * vec4(inPos.xyz + inNormal * uboInstance.outlineWidth, 1.0);
   locPos.y = -locPos.y;
-  outWorldPos = locPos.xyz / locPos.w;
-  outUV0 = inUV0;
-  outUV1 = inUV1;
   gl_Position =  uboView.projection * uboView.view * vec4(outWorldPos, 1.0);
 }

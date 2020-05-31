@@ -122,7 +122,7 @@ impl RenderPipeline {
 
         let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()
             .depth_test_enable(settings.depth_test_enabled)
-            .depth_write_enable(settings.depth_test_enabled)
+            .depth_write_enable(true)
             .depth_compare_op(vk::CompareOp::LESS_OR_EQUAL)
             .depth_bounds_test_enable(false)
             .min_depth_bounds(0.0)

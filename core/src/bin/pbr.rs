@@ -57,6 +57,7 @@ struct DemoApp {
     context: Arc<VulkanContext>,
     asset_geometry_buffer: Option<GeometryBuffer>,
     environment_maps: Option<EnvironmentMapSet>,
+    outline_pipeline: Option<RenderPipeline>,
     pbr_pipeline: Option<RenderPipeline>,
     pbr_pipeline_blend: Option<RenderPipeline>,
     pbr_pipeline_data: Option<PbrPipelineData>,
@@ -68,6 +69,7 @@ impl DemoApp {
     pub fn new(context: Arc<VulkanContext>) -> Self {
         Self {
             context,
+            outline_pipeline: None,
             pbr_pipeline: None,
             pbr_pipeline_blend: None,
             pbr_pipeline_data: None,
@@ -246,15 +248,16 @@ impl App for DemoApp {
                     if let Some(pbr_data) = &self.pbr_pipeline_data.as_ref() {
                         let mut dynamic_ubo = DynamicUniformBufferObject {
                             model: asset_transform * global_transform,
-                            joint_info: glm::vec4(0.0, 0.0, 0.0, 0.0),
+                            primitive_data: glm::vec4(0.0, 0.0, 0.05, 0.0),
                         };
 
                         if let Some(skin) = graph[node_index].skin.as_ref() {
                             let joint_count = skin.joints.len();
-                            dynamic_ubo.joint_info = glm::vec4(joint_count as f32, joint_offset as f32, 0.0, 0.0);
+                            dynamic_ubo.primitive_data.x = joint_count as f32;
+                            dynamic_ubo.primitive_data.y = joint_offset as f32;
                             for (index, joint) in skin.joints.iter().enumerate() {
                                 if index > UniformBufferObject::MAX_NUM_JOINTS {
-                                    eprintln!("Skin joint count {} is greater than the maximum joint limit of {}!", dynamic_ubo.joint_info, UniformBufferObject::MAX_NUM_JOINTS);
+                                    eprintln!("Skin joint count {} is greater than the maximum joint limit of {}!", dynamic_ubo.primitive_data, UniformBufferObject::MAX_NUM_JOINTS);
                                 }
 
                                 let joint_node_index = GltfAsset::matching_node_index(joint.target_gltf_index, &graph)
@@ -395,6 +398,31 @@ impl Command for DemoApp {
                 }
             });
 
+        // Render the outline
+        let outline_pipeline = self
+            .outline_pipeline
+            .as_ref()
+            .expect("Failed to get outline pipeline!");
+        outline_pipeline.bind(device, command_buffer);
+
+        [AlphaMode::Opaque, AlphaMode::Mask, AlphaMode::Blend]
+            .iter()
+            .for_each(|alpha_mode| {
+                let mut offsets = GltfOffsets::default();
+                for asset in self.assets.iter() {
+                    if *alpha_mode == AlphaMode::Blend {
+                        pbr_renderer_blended.draw_asset(device, &asset, &offsets, *alpha_mode);
+                    } else {
+                        pbr_renderer.draw_asset(device, &asset, &offsets, *alpha_mode);
+                    }
+                    offsets.texture_offset += asset.textures.len() as i32;
+                    offsets.mesh_offset += asset.number_of_meshes;
+                    offsets.index_offset += asset.indices.len() as u32;
+                    offsets.vertex_offset +=
+                        (asset.vertices.len() / GltfAsset::vertex_stride()) as u32;
+                }
+            });
+
         Ok(())
     }
 
@@ -427,19 +455,74 @@ impl Command for DemoApp {
         let descriptor_set_layout =
             Arc::new(PbrPipelineData::descriptor_set_layout(context.clone()));
 
+        let stencil_op_state = vk::StencilOpState::builder()
+            .compare_op(vk::CompareOp::ALWAYS)
+            .fail_op(vk::StencilOp::REPLACE)
+            .depth_fail_op(vk::StencilOp::REPLACE)
+            .pass_op(vk::StencilOp::REPLACE)
+            .compare_mask(0xFF)
+            .write_mask(0xFF)
+            .reference(1)
+            .build();
+
         let mut settings = RenderPipelineSettings::new(
             swapchain.render_pass.render_pass(),
             vertex_state_info,
-            descriptor_set_layout,
+            descriptor_set_layout.clone(),
             shader_set,
         )
+        .stencil_test_enabled(true)
+        .stencil_front_state(stencil_op_state)
+        .stencil_back_state(stencil_op_state)
         .push_constant_range(push_constant_range);
 
         self.pbr_pipeline = None;
         self.pbr_pipeline_blend = None;
         self.pbr_pipeline = Some(RenderPipeline::new(context.clone(), settings.clone()));
         settings.blended = true;
-        self.pbr_pipeline_blend = Some(RenderPipeline::new(context, settings));
+        self.pbr_pipeline_blend = Some(RenderPipeline::new(context.clone(), settings));
+
+        // Create outline pipeline
+        let descriptions = GltfAsset::create_vertex_input_descriptions();
+        let attributes = GltfAsset::create_vertex_attributes();
+        let vertex_state_info = vk::PipelineVertexInputStateCreateInfo::builder()
+            .vertex_binding_descriptions(&descriptions)
+            .vertex_attribute_descriptions(&attributes)
+            .build();
+
+        let shader_set = Arc::new(
+            ShaderSet::new(context.clone())
+                .context(CreateShaderSet {})?
+                .vertex_shader("core/assets/shaders/pbr/pbr_outline.vert.spv")
+                .context(CreateShader {})?
+                .fragment_shader("core/assets/shaders/pbr/pbr_outline.frag.spv")
+                .context(CreateShader {})?,
+        );
+
+        let stencil_op_state = vk::StencilOpState::builder()
+            .compare_op(vk::CompareOp::NOT_EQUAL)
+            .fail_op(vk::StencilOp::KEEP)
+            .depth_fail_op(vk::StencilOp::KEEP)
+            .pass_op(vk::StencilOp::REPLACE)
+            .compare_mask(0xFF)
+            .write_mask(0xFF)
+            .reference(1)
+            .build();
+
+        let settings = RenderPipelineSettings::new(
+            swapchain.render_pass.render_pass(),
+            vertex_state_info,
+            descriptor_set_layout,
+            shader_set,
+        )
+        .depth_test_enabled(false)
+        .stencil_test_enabled(true)
+        .stencil_front_state(stencil_op_state)
+        .stencil_back_state(stencil_op_state)
+        .push_constant_range(push_constant_range);
+
+        self.outline_pipeline = None;
+        self.outline_pipeline = Some(RenderPipeline::new(context, settings));
 
         Ok(())
     }
@@ -477,8 +560,9 @@ pub struct DynamicUniformBufferObject {
     pub model: glm::Mat4,
     // X value is the joint count.
     // Y value is the joint matrix offset.
+    // Z value is the outline width.
     // A vec4 is necessary for proper alignment
-    pub joint_info: glm::Vec4,
+    pub primitive_data: glm::Vec4,
 }
 
 pub struct PbrPipelineData {
