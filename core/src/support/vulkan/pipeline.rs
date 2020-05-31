@@ -13,6 +13,9 @@ pub struct RenderPipelineSettings {
     pub descriptor_set_layout: Arc<DescriptorSetLayout>,
     pub blended: bool,
     pub depth_test_enabled: bool,
+    pub stencil_test_enabled: bool,
+    pub stencil_front_state: vk::StencilOpState,
+    pub stencil_back_state: vk::StencilOpState,
     pub push_constant_range: Option<vk::PushConstantRange>,
     pub shader_set: Arc<ShaderSet>,
 }
@@ -31,6 +34,9 @@ impl RenderPipelineSettings {
             shader_set,
             blended: false,
             depth_test_enabled: true,
+            stencil_test_enabled: false,
+            stencil_front_state: vk::StencilOpState::default(),
+            stencil_back_state: vk::StencilOpState::default(),
             push_constant_range: None,
         }
     }
@@ -42,6 +48,11 @@ impl RenderPipelineSettings {
 
     pub fn depth_test_enabled(mut self, depth_test_enabled: bool) -> Self {
         self.depth_test_enabled = depth_test_enabled;
+        self
+    }
+
+    pub fn stencil_test_enabled(mut self, stencil_test_enabled: bool) -> Self {
+        self.stencil_test_enabled = stencil_test_enabled;
         self
     }
 
@@ -106,9 +117,9 @@ impl RenderPipeline {
             .depth_bounds_test_enable(false)
             .min_depth_bounds(0.0)
             .max_depth_bounds(1.0)
-            .stencil_test_enable(false)
-            .front(Default::default())
-            .back(Default::default())
+            .stencil_test_enable(settings.stencil_test_enabled)
+            .front(settings.stencil_front_state)
+            .back(settings.stencil_back_state)
             .build();
 
         let color_blend_attachments = if settings.blended {
