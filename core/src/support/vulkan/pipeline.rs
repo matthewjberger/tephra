@@ -56,6 +56,16 @@ impl RenderPipelineSettings {
         self
     }
 
+    pub fn stencil_front_state(mut self, stencil_front_state: vk::StencilOpState) -> Self {
+        self.stencil_front_state = stencil_front_state;
+        self
+    }
+
+    pub fn stencil_back_state(mut self, stencil_back_state: vk::StencilOpState) -> Self {
+        self.stencil_back_state = stencil_back_state;
+        self
+    }
+
     pub fn push_constant_range(mut self, push_constant_range: vk::PushConstantRange) -> Self {
         self.push_constant_range = Some(push_constant_range);
         self
