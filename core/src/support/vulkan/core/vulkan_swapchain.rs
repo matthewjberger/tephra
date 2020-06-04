@@ -1,4 +1,7 @@
-use crate::vulkan::{Swapchain, SwapchainProperties, VulkanContext, Framebuffer, RenderPass, CommandPool, ImageView, Texture};
+use crate::vulkan::{
+    CommandPool, Framebuffer, ImageView, RenderPass, Swapchain, SwapchainProperties, Texture,
+    VulkanContext,
+};
 use ash::vk;
 use std::sync::Arc;
 
@@ -210,7 +213,7 @@ impl VulkanSwapchain {
             usage: vk_mem::MemoryUsage::GpuOnly,
             ..Default::default()
         };
-        Texture::new(context, &image_allocation_create_info, &image_create_info)
+        Texture::new(context, &image_allocation_create_info, &image_create_info).unwrap()
     }
 
     fn transition_depth_texture(
@@ -308,7 +311,7 @@ impl VulkanSwapchain {
             usage: vk_mem::MemoryUsage::GpuOnly,
             ..Default::default()
         };
-        Texture::new(context, &image_allocation_create_info, &image_create_info)
+        Texture::new(context, &image_allocation_create_info, &image_create_info).unwrap()
     }
 
     fn transition_color_texture(

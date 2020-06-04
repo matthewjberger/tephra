@@ -26,7 +26,7 @@ impl PrefilterMap {
         let dimension = 512;
         let format = vk::Format::R16G16B16A16_SFLOAT;
 
-        let output_cubemap = Cubemap::new(context.clone(), dimension, format);
+        let output_cubemap = Cubemap::new(context.clone(), dimension, format).unwrap();
 
         let render_pass = Self::create_render_pass(context.clone(), format);
 

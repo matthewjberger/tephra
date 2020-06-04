@@ -122,7 +122,7 @@ impl Brdflut {
             ..Default::default()
         };
 
-        Texture::new(context, &allocation_create_info, &image_create_info)
+        Texture::new(context, &allocation_create_info, &image_create_info).unwrap()
     }
 
     fn create_image_view(

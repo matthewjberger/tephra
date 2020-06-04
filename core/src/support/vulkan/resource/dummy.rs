@@ -44,7 +44,8 @@ impl DummyImage {
             ..Default::default()
         };
 
-        let image = Texture::new(context.clone(), &allocation_create_info, &image_create_info);
+        let image =
+            Texture::new(context.clone(), &allocation_create_info, &image_create_info).unwrap();
 
         let create_info = vk::ImageViewCreateInfo::builder()
             .image(image.image())

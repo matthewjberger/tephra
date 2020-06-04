@@ -47,12 +47,13 @@ impl HdrCubemap {
         command_pool: &CommandPool,
         path: &str,
     ) -> Result<Self> {
-        let description = TextureDescription::from_hdr(path);
-        let hdr_texture_bundle = TextureBundle::new(context.clone(), &command_pool, &description);
+        let description = TextureDescription::from_hdr(path).unwrap();
+        let hdr_texture_bundle =
+            TextureBundle::new(context.clone(), &command_pool, &description).unwrap();
 
         let dimension = description.width;
         let format = vk::Format::R32G32B32A32_SFLOAT;
-        let output_cubemap = Cubemap::new(context.clone(), dimension, format);
+        let output_cubemap = Cubemap::new(context.clone(), dimension, format).unwrap();
 
         let render_pass = Self::create_render_pass(context.clone(), format);
 

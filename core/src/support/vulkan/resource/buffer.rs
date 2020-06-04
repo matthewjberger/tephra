@@ -1,8 +1,7 @@
 use crate::vulkan::{CommandPool, VulkanContext};
 use ash::{version::DeviceV1_0, vk};
-use std::sync::Arc;
-
 use snafu::{ResultExt, Snafu};
+use std::sync::Arc;
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 

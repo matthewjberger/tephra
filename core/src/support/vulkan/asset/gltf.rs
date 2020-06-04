@@ -134,13 +134,14 @@ impl GltfAsset {
         let (gltf, buffers, asset_textures) =
             gltf::import(&asset_name).expect("Couldn't import file!");
 
-        let textures = asset_textures
+        let textures: Result<Vec<_>, _> = asset_textures
             .iter()
             .map(|image_data| {
-                let description = TextureDescription::from_gltf(&image_data);
+                let description = TextureDescription::from_gltf(&image_data).unwrap();
                 TextureBundle::new(context.clone(), command_pool, &description)
             })
-            .collect::<Vec<_>>();
+            .collect();
+        let textures = textures.unwrap();
 
         let animations = Self::prepare_animations(&gltf, &buffers);
 

@@ -4,7 +4,56 @@ use gltf::image::Format;
 use image::{DynamicImage, ImageBuffer, Pixel, RgbImage};
 use std::{iter, sync::Arc};
 
-// TODO: Add snafu errors
+use snafu::{OptionExt, ResultExt, Snafu};
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility = "pub(crate)")]
+pub enum Error {
+    #[snafu(display("Failed to open HDR file {}: {}", path, source))]
+    OpenHdrFile {
+        source: std::io::Error,
+        path: String,
+    },
+
+    #[snafu(display("Failed to create HDR decoder: {}", source))]
+    CreateHdrDecoder { source: image::ImageError },
+
+    #[snafu(display("Failed to read HDR image: {}", source))]
+    ReadHdrImage { source: image::ImageError },
+
+    #[snafu(display("Failed to open image file {}: {}", path, source))]
+    OpenImageFile {
+        source: image::ImageError,
+        path: String,
+    },
+
+    #[snafu(display("Failed to create texture: {}", source))]
+    CreateTexture { source: vk_mem::error::Error },
+
+    #[snafu(display("Failed to create image buffer"))]
+    CreateImageBuffer,
+
+    #[snafu(display("Failed to image copy buffer: {}", source))]
+    CreateImageCopyBuffer {
+        source: crate::vulkan::resource::buffer::Error,
+    },
+
+    #[snafu(display("Failed to upload to image copy buffer: {}", source))]
+    UploadImageCopyBuffer {
+        source: crate::vulkan::resource::buffer::Error,
+    },
+
+    #[snafu(display("Failed to cubemap image copy buffer: {}", source))]
+    CreateCubemapImageCopyBuffer {
+        source: crate::vulkan::resource::buffer::Error,
+    },
+
+    #[snafu(display("Failed to upload to a cubemap image copy buffer: {}", source))]
+    UploadCubemapImageCopyBuffer {
+        source: crate::vulkan::resource::buffer::Error,
+    },
+}
 
 pub struct ImageLayoutTransition {
     pub old_layout: vk::ImageLayout,
@@ -34,13 +83,16 @@ impl TextureDescription {
         }
     }
 
-    pub fn from_hdr(path: &str) -> Self {
-        let decoder = image::hdr::HdrDecoder::new(std::io::BufReader::new(
-            std::fs::File::open(&path).expect("Failed to open file!"),
-        ))
-        .expect("Failed to create hdr decoder!");
+    pub fn from_hdr(path: &str) -> Result<Self> {
+        let file = std::fs::File::open(&path).context(OpenHdrFile {
+            path: path.to_string(),
+        })?;
+
+        let decoder = image::hdr::HdrDecoder::new(std::io::BufReader::new(file))
+            .context(CreateHdrDecoder {})?;
+
         let metadata = decoder.metadata();
-        let decoded = decoder.read_image_hdr().expect("Failed to read hdr image!");
+        let decoded = decoder.read_image_hdr().context(ReadHdrImage {})?;
         let format = vk::Format::R32G32B32A32_SFLOAT;
         let width = metadata.width as u32;
         let height = metadata.height as u32;
@@ -53,21 +105,25 @@ impl TextureDescription {
             unsafe { std::slice::from_raw_parts(data.as_ptr() as *const u8, data.len() * 4) }
                 .to_vec();
 
-        Self {
+        let description = Self {
             format,
             width,
             height,
             pixels,
             mip_levels,
-        }
+        };
+
+        Ok(description)
     }
 
-    pub fn from_file(path: &str) -> Self {
-        let image = image::open(path).expect("Failed to open image path!");
+    pub fn from_file(path: &str) -> Result<Self> {
+        let image = image::open(path).context(OpenImageFile {
+            path: path.to_string(),
+        })?;
         Self::from_image(&image)
     }
 
-    pub fn from_image(image: &DynamicImage) -> Self {
+    pub fn from_image(image: &DynamicImage) -> Result<Self> {
         let (format, (width, height)) = match image {
             DynamicImage::ImageRgb8(buffer) => (vk::Format::R8G8B8_UNORM, buffer.dimensions()),
             DynamicImage::ImageRgba8(buffer) => (vk::Format::R8G8B8A8_UNORM, buffer.dimensions()),
@@ -87,11 +143,11 @@ impl TextureDescription {
             pixels: image.to_bytes(),
             mip_levels: Self::calculate_mip_levels(width, height),
         };
-        description.convert_24bit_formats();
-        description
+        description.convert_24bit_formats()?;
+        Ok(description)
     }
 
-    pub fn from_gltf(data: &gltf::image::Data) -> Self {
+    pub fn from_gltf(data: &gltf::image::Data) -> Result<Self> {
         let format = Self::convert_to_vulkan_format(data.format);
         let mut description = Self {
             format,
@@ -100,39 +156,43 @@ impl TextureDescription {
             pixels: data.pixels.to_vec(),
             mip_levels: Self::calculate_mip_levels(data.width, data.height),
         };
-        description.convert_24bit_formats();
-        description
+        description.convert_24bit_formats()?;
+        Ok(description)
     }
 
     pub fn calculate_mip_levels(width: u32, height: u32) -> u32 {
         ((width.min(height) as f32).log2().floor() + 1.0) as u32
     }
 
-    fn convert_24bit_formats(&mut self) {
+    fn convert_24bit_formats(&mut self) -> Result<()> {
         // 24-bit formats are unsupported, so they
         // need to have an alpha channel added to make them 32-bit
         match self.format {
             vk::Format::R8G8B8_UNORM => {
                 self.format = vk::Format::R8G8B8A8_UNORM;
-                self.attach_alpha_channel();
+                self.attach_alpha_channel()?;
             }
             vk::Format::B8G8R8_UNORM => {
                 self.format = vk::Format::B8G8R8A8_UNORM;
-                self.attach_alpha_channel();
+                self.attach_alpha_channel()?;
             }
             _ => {}
         };
+
+        Ok(())
     }
 
-    fn attach_alpha_channel(&mut self) {
+    fn attach_alpha_channel(&mut self) -> Result<()> {
         let image_buffer: RgbImage =
             ImageBuffer::from_raw(self.width, self.height, self.pixels.to_vec())
-                .expect("Failed to create an image buffer");
+                .context(CreateImageBuffer {})?;
 
         self.pixels = image_buffer
             .pixels()
             .flat_map(|pixel| pixel.to_rgba().channels().to_vec())
             .collect::<Vec<_>>();
+
+        Ok(())
     }
 
     fn convert_to_vulkan_format(format: Format) -> vk::Format {
@@ -165,25 +225,27 @@ impl Texture {
         context: Arc<VulkanContext>,
         allocation_create_info: &vk_mem::AllocationCreateInfo,
         image_create_info: &vk::ImageCreateInfo,
-    ) -> Self {
+    ) -> Result<Self> {
         let (image, allocation, allocation_info) = context
             .allocator()
             .create_image(&image_create_info, &allocation_create_info)
-            .expect("Failed to create image!");
+            .context(CreateTexture {})?;
 
-        Self {
+        let texture = Self {
             image,
             allocation,
             allocation_info,
             context,
-        }
+        };
+
+        Ok(texture)
     }
 
     pub fn upload_texture_data(
         &self,
         command_pool: &CommandPool,
         description: &TextureDescription,
-    ) {
+    ) -> Result<()> {
         let region = vk::BufferImageCopy::builder()
             .buffer_offset(0)
             .buffer_row_length(0)
@@ -208,8 +270,10 @@ impl Texture {
             vk::BufferUsageFlags::TRANSFER_SRC,
             vk_mem::MemoryUsage::CpuToGpu,
         )
-        .unwrap();
-        buffer.upload_to_buffer(&description.pixels, 0).unwrap();
+        .context(CreateImageCopyBuffer {})?;
+        buffer
+            .upload_to_buffer(&description.pixels, 0)
+            .context(UploadImageCopyBuffer {})?;
 
         let transition = ImageLayoutTransition {
             old_layout: vk::ImageLayout::UNDEFINED,
@@ -224,6 +288,8 @@ impl Texture {
         command_pool.copy_buffer_to_image(buffer.buffer(), self.image(), &regions);
 
         self.generate_mipmaps(&command_pool, &description);
+
+        Ok(())
     }
 
     pub fn generate_mipmaps(
@@ -459,7 +525,7 @@ impl CubemapFaces {
             .chain(iter::once(self.front.to_string()))
     }
 
-    pub fn create_descriptions(&self) -> Vec<TextureDescription> {
+    pub fn create_descriptions(&self) -> Vec<Result<TextureDescription>> {
         self.ordered_faces()
             .map(|face| TextureDescription::from_file(&face))
             .collect::<Vec<_>>()
@@ -475,26 +541,28 @@ pub struct Cubemap {
 }
 
 impl Cubemap {
-    pub fn new(context: Arc<VulkanContext>, dimension: u32, format: vk::Format) -> Self {
+    pub fn new(context: Arc<VulkanContext>, dimension: u32, format: vk::Format) -> Result<Self> {
         let description = TextureDescription::empty(dimension, dimension, format);
-        let texture = Self::create_texture(context.clone(), &description);
+        let texture = Self::create_texture(context.clone(), &description)?;
         let view = Self::create_view(context.clone(), &texture, &description);
         let sampler = Self::create_sampler(context.clone(), &description);
 
-        Self {
+        let cubemap = Self {
             texture,
             view,
             sampler,
             description,
             context,
-        }
+        };
+
+        Ok(cubemap)
     }
 
     pub fn upload_texture_data(
         &self,
         command_pool: &CommandPool,
         descriptions: &[TextureDescription],
-    ) {
+    ) -> Result<()> {
         let mut pixels: Vec<u8> = Vec::new();
         descriptions.iter().for_each(|description| {
             pixels.extend(&description.pixels);
@@ -506,8 +574,11 @@ impl Cubemap {
             vk::BufferUsageFlags::TRANSFER_SRC,
             vk_mem::MemoryUsage::CpuToGpu,
         )
-        .unwrap();
-        buffer.upload_to_buffer(&pixels, 0).unwrap();
+        .context(CreateCubemapImageCopyBuffer {})?;
+
+        buffer
+            .upload_to_buffer(&pixels, 0)
+            .context(UploadCubemapImageCopyBuffer {})?;
 
         let transition = ImageLayoutTransition {
             old_layout: vk::ImageLayout::UNDEFINED,
@@ -557,9 +628,14 @@ impl Cubemap {
             dst_stage_mask: vk::PipelineStageFlags::FRAGMENT_SHADER,
         };
         self.transition(&command_pool, &transition);
+
+        Ok(())
     }
 
-    fn create_texture(context: Arc<VulkanContext>, description: &TextureDescription) -> Texture {
+    fn create_texture(
+        context: Arc<VulkanContext>,
+        description: &TextureDescription,
+    ) -> Result<Texture> {
         let image_create_info = vk::ImageCreateInfo::builder()
             .image_type(vk::ImageType::TYPE_2D)
             .extent(vk::Extent3D {
@@ -676,23 +752,28 @@ impl TextureBundle {
         context: Arc<VulkanContext>,
         command_pool: &CommandPool,
         description: &TextureDescription,
-    ) -> Self {
-        let texture = Self::create_texture(context.clone(), &description);
+    ) -> Result<Self> {
+        let texture = Self::create_texture(context.clone(), &description)?;
 
-        texture.upload_texture_data(&command_pool, &description);
+        texture.upload_texture_data(&command_pool, &description)?;
 
         let view = Self::create_image_view(context.clone(), &texture, &description);
 
         let sampler = Self::create_sampler(context, description.mip_levels);
 
-        Self {
+        let texture_bundle = Self {
             texture,
             view,
             sampler,
-        }
+        };
+
+        Ok(texture_bundle)
     }
 
-    fn create_texture(context: Arc<VulkanContext>, description: &TextureDescription) -> Texture {
+    fn create_texture(
+        context: Arc<VulkanContext>,
+        description: &TextureDescription,
+    ) -> Result<Texture> {
         let image_create_info = vk::ImageCreateInfo::builder()
             .image_type(vk::ImageType::TYPE_2D)
             .extent(vk::Extent3D {
