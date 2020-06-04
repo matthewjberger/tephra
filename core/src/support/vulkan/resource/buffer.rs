@@ -2,7 +2,22 @@ use crate::vulkan::{CommandPool, VulkanContext};
 use ash::{version::DeviceV1_0, vk};
 use std::sync::Arc;
 
-// TODO: Add snafu errors
+use snafu::{ResultExt, Snafu};
+
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility = "pub(crate)")]
+pub enum Error {
+    #[snafu(display("Failed to create buffer: {}", source))]
+    CreateBuffer { source: vk_mem::error::Error },
+
+    #[snafu(display("Failed to map memory: {}", source))]
+    MapMemory { source: vk_mem::error::Error },
+
+    #[snafu(display("Failed to unmap memory: {}", source))]
+    UnmapMemory { source: vk_mem::error::Error },
+}
 
 pub struct Buffer {
     buffer: vk::Buffer,
@@ -16,18 +31,20 @@ impl Buffer {
         context: Arc<VulkanContext>,
         allocation_create_info: &vk_mem::AllocationCreateInfo,
         buffer_create_info: &vk::BufferCreateInfo,
-    ) -> Self {
+    ) -> Result<Self> {
         let (buffer, allocation, allocation_info) = context
             .allocator()
             .create_buffer(&buffer_create_info, &allocation_create_info)
-            .expect("Failed to create buffer!");
+            .context(CreateBuffer {})?;
 
-        Self {
+        let buffer = Self {
             buffer,
             allocation,
             allocation_info,
             context,
-        }
+        };
+
+        Ok(buffer)
     }
 
     pub fn new_mapped_basic(
@@ -35,7 +52,7 @@ impl Buffer {
         size: vk::DeviceSize,
         buffer_usage: vk::BufferUsageFlags,
         memory_usage: vk_mem::MemoryUsage,
-    ) -> Self {
+    ) -> Result<Self> {
         let allocation_create_info = vk_mem::AllocationCreateInfo {
             usage: memory_usage,
             ..Default::default()
@@ -50,14 +67,14 @@ impl Buffer {
         Buffer::new(context, &allocation_create_info, &buffer_create_info)
     }
 
-    pub fn upload_to_buffer<T>(&self, data: &[T], offset: usize) {
+    pub fn upload_to_buffer<T>(&self, data: &[T], offset: usize) -> Result<()> {
         // TODO: Add checks for size of data being written
-        let data_pointer = self.map_memory().expect("Failed to map memory!");
+        let data_pointer = self.map_memory().context(MapMemory {})?;
         unsafe {
             data_pointer.add(offset);
             (data_pointer as *mut T).copy_from_nonoverlapping(data.as_ptr(), data.len());
         }
-        self.unmap_memory().expect("Failed to unmap memory!");
+        self.unmap_memory().context(UnmapMemory {})
     }
 
     pub fn upload_to_buffer_aligned<T: Copy>(
@@ -65,8 +82,8 @@ impl Buffer {
         data: &[T],
         offset: usize,
         alignment: vk::DeviceSize,
-    ) {
-        let data_pointer = self.map_memory().expect("Failed to map memory!");
+    ) -> Result<()> {
+        let data_pointer = self.map_memory().context(MapMemory {})?;
         unsafe {
             let mut align = ash::util::Align::new(
                 data_pointer.add(offset) as _,
@@ -75,7 +92,7 @@ impl Buffer {
             );
             align.copy_from_slice(data);
         }
-        self.unmap_memory().expect("Failed to unmap memory!");
+        self.unmap_memory().context(UnmapMemory {})
     }
 
     pub fn map_memory(&self) -> vk_mem::error::Result<*mut u8> {

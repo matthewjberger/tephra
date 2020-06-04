@@ -76,8 +76,9 @@ impl CommandPool {
             buffer_size,
             vk::BufferUsageFlags::TRANSFER_SRC,
             vk_mem::MemoryUsage::CpuToGpu,
-        );
-        staging_buffer.upload_to_buffer(&data, 0);
+        )
+        .unwrap();
+        staging_buffer.upload_to_buffer(&data, 0).unwrap();
         staging_buffer
     }
 
@@ -94,7 +95,8 @@ impl CommandPool {
             staging_buffer.allocation_info().get_size() as _,
             vk::BufferUsageFlags::TRANSFER_DST | usage_flags,
             vk_mem::MemoryUsage::GpuOnly,
-        );
+        )
+        .unwrap();
 
         self.copy_buffer_to_buffer(
             staging_buffer.buffer(),

@@ -207,8 +207,9 @@ impl Texture {
             self.allocation_info().get_size() as _,
             vk::BufferUsageFlags::TRANSFER_SRC,
             vk_mem::MemoryUsage::CpuToGpu,
-        );
-        buffer.upload_to_buffer(&description.pixels, 0);
+        )
+        .unwrap();
+        buffer.upload_to_buffer(&description.pixels, 0).unwrap();
 
         let transition = ImageLayoutTransition {
             old_layout: vk::ImageLayout::UNDEFINED,
@@ -504,8 +505,9 @@ impl Cubemap {
             self.texture.allocation_info().get_size() as _,
             vk::BufferUsageFlags::TRANSFER_SRC,
             vk_mem::MemoryUsage::CpuToGpu,
-        );
-        buffer.upload_to_buffer(&pixels, 0);
+        )
+        .unwrap();
+        buffer.upload_to_buffer(&pixels, 0).unwrap();
 
         let transition = ImageLayoutTransition {
             old_layout: vk::ImageLayout::UNDEFINED,

@@ -134,7 +134,10 @@ impl App for DemoApp {
         };
         let ubos = [ubo];
 
-        self.pipeline_data.uniform_buffer.upload_to_buffer(&ubos, 0);
+        self.pipeline_data
+            .uniform_buffer
+            .upload_to_buffer(&ubos, 0)
+            .unwrap();
 
         window
             .set_cursor_position(app_state.window_center())
@@ -256,7 +259,8 @@ impl ModelPipelineData {
             mem::size_of::<UniformBufferObject>() as _,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
             vk_mem::MemoryUsage::CpuToGpu,
-        );
+        )
+        .unwrap();
 
         let data = ModelPipelineData {
             descriptor_pool,

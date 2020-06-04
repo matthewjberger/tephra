@@ -282,7 +282,7 @@ impl App for DemoApp {
                             &dynamic_ubos,
                             offset,
                             pbr_data.dynamic_alignment,
-                        );
+                        ).unwrap();
 
                         let dynamic_ubo_size = (asset.number_of_meshes as u64
                             * pbr_data.dynamic_alignment)
@@ -299,7 +299,7 @@ impl App for DemoApp {
 
         let ubos = [ubo];
         if let Some(pbr_data) = &self.pbr_pipeline_data.as_ref() {
-            pbr_data.uniform_buffer.upload_to_buffer(&ubos, 0);
+            pbr_data.uniform_buffer.upload_to_buffer(&ubos, 0).unwrap();
         }
 
         window
@@ -511,7 +511,8 @@ impl PbrPipelineData {
             mem::size_of::<UniformBufferObject>() as _,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
             vk_mem::MemoryUsage::CpuToGpu,
-        );
+        )
+        .unwrap();
 
         let dynamic_alignment = Self::calculate_dynamic_alignment(context.clone());
 
@@ -520,7 +521,8 @@ impl PbrPipelineData {
             (number_of_meshes as u64 * dynamic_alignment) as vk::DeviceSize,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
             vk_mem::MemoryUsage::CpuToGpu,
-        );
+        )
+        .unwrap();
 
         let data = PbrPipelineData {
             descriptor_pool,
