@@ -55,41 +55,43 @@ impl Brdflut {
 
         let pipeline = Self::create_pipeline(context.clone(), &render_pass);
 
-        command_pool.execute_command_once(context.graphics_queue(), |command_buffer| unsafe {
-            device.cmd_begin_render_pass(
-                command_buffer,
-                &render_pass_begin_info,
-                vk::SubpassContents::INLINE,
-            );
+        command_pool
+            .execute_command_once(context.graphics_queue(), |command_buffer| unsafe {
+                device.cmd_begin_render_pass(
+                    command_buffer,
+                    &render_pass_begin_info,
+                    vk::SubpassContents::INLINE,
+                );
 
-            let viewport = vk::Viewport {
-                x: 0.0,
-                y: 0.0,
-                width: dimension as _,
-                height: dimension as _,
-                min_depth: 0.0,
-                max_depth: 1.0,
-            };
-            let viewports = [viewport];
+                let viewport = vk::Viewport {
+                    x: 0.0,
+                    y: 0.0,
+                    width: dimension as _,
+                    height: dimension as _,
+                    min_depth: 0.0,
+                    max_depth: 1.0,
+                };
+                let viewports = [viewport];
 
-            let scissor = vk::Rect2D {
-                offset: vk::Offset2D { x: 0, y: 0 },
-                extent,
-            };
-            let scissors = [scissor];
+                let scissor = vk::Rect2D {
+                    offset: vk::Offset2D { x: 0, y: 0 },
+                    extent,
+                };
+                let scissors = [scissor];
 
-            device.cmd_set_viewport(command_buffer, 0, &viewports);
-            device.cmd_set_scissor(command_buffer, 0, &scissors);
+                device.cmd_set_viewport(command_buffer, 0, &viewports);
+                device.cmd_set_scissor(command_buffer, 0, &scissors);
 
-            device.cmd_bind_pipeline(
-                command_buffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                pipeline.pipeline(),
-            );
-            device.cmd_draw(command_buffer, 3, 1, 0, 0);
+                device.cmd_bind_pipeline(
+                    command_buffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    pipeline.pipeline(),
+                );
+                device.cmd_draw(command_buffer, 3, 1, 0, 0);
 
-            device.cmd_end_render_pass(command_buffer);
-        });
+                device.cmd_end_render_pass(command_buffer);
+            })
+            .unwrap();
 
         Self {
             texture,

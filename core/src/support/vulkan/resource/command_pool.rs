@@ -1,8 +1,25 @@
 use crate::vulkan::{Buffer, CurrentFrameSynchronization, Fence, VulkanContext};
 use ash::{version::DeviceV1_0, vk};
+use snafu::{ResultExt, Snafu};
 use std::sync::Arc;
 
-// TODO: Add snafu errors
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility = "pub(crate)")]
+pub enum Error {
+    #[snafu(display("Failed to create a command pool: {}", source))]
+    CreateCommandPool { source: ash::vk::Result },
+
+    #[snafu(display("Failed to allocate command buffers: {}", source))]
+    AllocateCommandBuffers { source: ash::vk::Result },
+
+    #[snafu(display("Failed to submit command buffer to queue {:?}: {}", queue, source))]
+    SubmitCommandBuffer {
+        source: ash::vk::Result,
+        queue: vk::Queue,
+    },
+}
 
 pub struct CommandPool {
     pool: vk::CommandPool,
@@ -11,7 +28,7 @@ pub struct CommandPool {
 }
 
 impl CommandPool {
-    pub fn new(context: Arc<VulkanContext>, flags: vk::CommandPoolCreateFlags) -> Self {
+    pub fn new(context: Arc<VulkanContext>, flags: vk::CommandPoolCreateFlags) -> Result<Self> {
         let command_pool_info = vk::CommandPoolCreateInfo::builder()
             .queue_family_index(context.graphics_queue_family_index())
             .flags(flags)
@@ -22,14 +39,16 @@ impl CommandPool {
                 .logical_device()
                 .logical_device()
                 .create_command_pool(&command_pool_info, None)
-                .expect("Failed to create a command pool!")
+                .context(CreateCommandPool {})?
         };
 
-        CommandPool {
+        let command_pool = CommandPool {
             pool,
             context,
             command_buffers: Vec::new(),
-        }
+        };
+
+        Ok(command_pool)
     }
 
     pub fn pool(&self) -> vk::CommandPool {
@@ -40,7 +59,7 @@ impl CommandPool {
         &self.command_buffers
     }
 
-    pub fn allocate_command_buffers(&mut self, size: vk::DeviceSize) {
+    pub fn allocate_command_buffers(&mut self, size: vk::DeviceSize) -> Result<()> {
         let allocate_info = vk::CommandBufferAllocateInfo::builder()
             .command_pool(self.pool)
             .level(vk::CommandBufferLevel::PRIMARY)
@@ -52,8 +71,10 @@ impl CommandPool {
                 .logical_device()
                 .logical_device()
                 .allocate_command_buffers(&allocate_info)
-                .expect("Failed to allocate command buffers!")
+                .context(AllocateCommandBuffers {})?
         };
+
+        Ok(())
     }
 
     pub fn clear_command_buffers(&mut self) {
@@ -114,7 +135,7 @@ impl CommandPool {
         queue: vk::Queue,
         wait_stages: &[vk::PipelineStageFlags],
         current_frame_synchronization: &CurrentFrameSynchronization,
-    ) {
+    ) -> Result<()> {
         let image_available_semaphores = [current_frame_synchronization.image_available()];
         let render_finished_semaphores = [current_frame_synchronization.render_finished()];
         // TODO: Add error handling, index may be invalid
@@ -135,8 +156,9 @@ impl CommandPool {
                     &submit_info_arr,
                     current_frame_synchronization.in_flight(),
                 )
-                .expect("Failed to submit command buffer to queue!")
+                .context(SubmitCommandBuffer { queue })?
         }
+        Ok(())
     }
 
     pub fn copy_image_to_image(
@@ -161,7 +183,8 @@ impl CommandPool {
                         &regions,
                     )
             };
-        });
+        })
+        .unwrap();
     }
 
     pub fn copy_buffer_to_buffer(
@@ -177,7 +200,8 @@ impl CommandPool {
                     .logical_device()
                     .cmd_copy_buffer(command_buffer, source, destination, &regions)
             };
-        });
+        })
+        .unwrap();
     }
 
     pub fn copy_buffer_to_image(
@@ -197,7 +221,8 @@ impl CommandPool {
                     vk::ImageLayout::TRANSFER_DST_OPTIMAL,
                     regions,
                 )
-        });
+        })
+        .unwrap();
     }
 
     // TODO: Refactor this to be smaller. Functionality can probably be reused
@@ -206,7 +231,7 @@ impl CommandPool {
         &self,
         queue: vk::Queue,
         executor: F,
-    ) {
+    ) -> Result<()> {
         // Allocate a command buffer using the command pool
         let command_buffer = {
             let allocation_info = vk::CommandBufferAllocateInfo::builder()
@@ -220,9 +245,9 @@ impl CommandPool {
                     .logical_device()
                     .logical_device()
                     .allocate_command_buffers(&allocation_info)
-                    .expect("Failed to allocate command buffers")[0]
+                    .context(AllocateCommandBuffers {})
             }
-        };
+        }?[0];
         let command_buffers = [command_buffer];
 
         // Begin recording
@@ -274,6 +299,8 @@ impl CommandPool {
             // Free the command buffer
             logical_device.free_command_buffers(self.pool(), &command_buffers);
         };
+
+        Ok(())
     }
 
     // TODO: Move this to the texture module
@@ -298,7 +325,8 @@ impl CommandPool {
                         &barriers,
                     )
             };
-        });
+        })
+        .unwrap();
     }
 }
 

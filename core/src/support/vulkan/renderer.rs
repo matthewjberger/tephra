@@ -44,10 +44,11 @@ impl Renderer {
         let command_pool = CommandPool::new(
             context.clone(),
             vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
-        );
+        )
+        .unwrap();
 
         let transient_command_pool =
-            CommandPool::new(context.clone(), vk::CommandPoolCreateFlags::TRANSIENT);
+            CommandPool::new(context.clone(), vk::CommandPoolCreateFlags::TRANSIENT).unwrap();
 
         let logical_size = window.inner_size();
         let dimensions = [logical_size.width as u32, logical_size.height as u32];
@@ -78,7 +79,8 @@ impl Renderer {
         // Allocate one command buffer per swapchain image
         let number_of_framebuffers = self.vulkan_swapchain().framebuffers.len();
         self.command_pool
-            .allocate_command_buffers(number_of_framebuffers as _);
+            .allocate_command_buffers(number_of_framebuffers as _)
+            .unwrap();
     }
 
     pub fn record_all_command_buffers(&self, command: &mut dyn Command) {
@@ -126,12 +128,14 @@ impl Renderer {
             .reset_fence(&current_frame_synchronization);
 
         let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
-        self.command_pool.submit_command_buffer(
-            image_index as usize,
-            self.context.graphics_queue(),
-            &wait_stages,
-            &current_frame_synchronization,
-        );
+        self.command_pool
+            .submit_command_buffer(
+                image_index as usize,
+                self.context.graphics_queue(),
+                &wait_stages,
+                &current_frame_synchronization,
+            )
+            .unwrap();
 
         let swapchain_presentation_result =
             self.vulkan_swapchain().swapchain.present_rendered_image(

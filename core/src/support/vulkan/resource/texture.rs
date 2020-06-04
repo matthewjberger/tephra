@@ -2,9 +2,9 @@ use crate::vulkan::{Buffer, CommandPool, ImageView, Sampler, VulkanContext};
 use ash::{version::DeviceV1_0, vk};
 use gltf::image::Format;
 use image::{DynamicImage, ImageBuffer, Pixel, RgbImage};
+use snafu::{OptionExt, ResultExt, Snafu};
 use std::{iter, sync::Arc};
 
-use snafu::{OptionExt, ResultExt, Snafu};
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug, Snafu)]
@@ -382,9 +382,8 @@ impl Texture {
                 .build();
             let blits = [blit];
 
-            command_pool.execute_command_once(
-                self.context.graphics_queue(),
-                |command_buffer| unsafe {
+            command_pool
+                .execute_command_once(self.context.graphics_queue(), |command_buffer| unsafe {
                     self.context
                         .logical_device()
                         .logical_device()
@@ -397,8 +396,8 @@ impl Texture {
                             &blits,
                             vk::Filter::LINEAR,
                         )
-                },
-            );
+                })
+                .unwrap();
 
             let barrier = vk::ImageMemoryBarrier::builder()
                 .image(self.image())

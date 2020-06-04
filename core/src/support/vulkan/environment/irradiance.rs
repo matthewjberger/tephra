@@ -158,9 +158,8 @@ impl IrradianceMap {
                 viewport.height = current_dimension;
                 let viewports = [viewport];
 
-                command_pool.execute_command_once(
-                    context.graphics_queue(),
-                    |command_buffer| unsafe {
+                command_pool
+                    .execute_command_once(context.graphics_queue(), |command_buffer| unsafe {
                         device.cmd_set_viewport(command_buffer, 0, &viewports);
                         device.cmd_set_scissor(command_buffer, 0, &scissors);
 
@@ -203,8 +202,8 @@ impl IrradianceMap {
                         unit_cube.draw(device, command_buffer);
 
                         device.cmd_end_render_pass(command_buffer);
-                    },
-                );
+                    })
+                    .unwrap();
 
                 let transition = ImageLayoutTransition {
                     old_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
