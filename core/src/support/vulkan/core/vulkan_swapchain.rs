@@ -26,7 +26,7 @@ impl VulkanSwapchain {
             vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
         );
 
-        let swapchain = Swapchain::new(context.clone(), dimensions);
+        let swapchain = Swapchain::new(context.clone(), dimensions).unwrap();
         let render_pass =
             Self::create_render_pass(context.clone(), &swapchain.properties(), depth_format);
 

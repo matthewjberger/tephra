@@ -1,9 +1,22 @@
 use crate::vulkan::{CurrentFrameSynchronization, ImageView, VulkanContext};
 use ash::{extensions::khr::Swapchain as AshSwapchain, vk};
+use snafu::{ResultExt, Snafu};
 use std::sync::Arc;
 
-// TODO: Break out swapchain properties to seperate file
-// TODO: Add snafu errors
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility = "pub(crate)")]
+pub enum Error {
+    #[snafu(display("Failed to get physical device surface capabilities: {}", source))]
+    GetSurfaceCapabilities { source: ash::vk::Result },
+
+    #[snafu(display("Failed to get physical device surface formats: {}", source))]
+    GetSurfaceFormats { source: ash::vk::Result },
+
+    #[snafu(display("Failed to get physical device surface present modes: {}", source))]
+    GetSurfacePresentModes { source: ash::vk::Result },
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct SwapchainProperties {
@@ -30,7 +43,7 @@ pub struct SwapchainSupportDetails {
 }
 
 impl SwapchainSupportDetails {
-    pub fn new(context: &VulkanContext) -> Self {
+    pub fn new(context: &VulkanContext) -> Result<Self> {
         // Get the surface capabilities
         let capabilities = unsafe {
             context
@@ -39,7 +52,7 @@ impl SwapchainSupportDetails {
                     context.physical_device(),
                     context.surface_khr(),
                 )
-                .expect("Failed to get physical device surface capabilities")
+                .context(GetSurfaceCapabilities {})?
         };
 
         // Get the supported surface formats
@@ -50,7 +63,7 @@ impl SwapchainSupportDetails {
                     context.physical_device(),
                     context.surface_khr(),
                 )
-                .expect("Failed to get physical device surface formats")
+                .context(GetSurfaceFormats {})?
         };
 
         // Get the supported present modes
@@ -61,14 +74,16 @@ impl SwapchainSupportDetails {
                     context.physical_device(),
                     context.surface_khr(),
                 )
-                .expect("Failed to get physical device surface present modes")
+                .context(GetSurfacePresentModes {})?
         };
 
-        Self {
+        let details = Self {
             capabilities,
             formats,
             present_modes,
-        }
+        };
+
+        Ok(details)
     }
 
     pub fn suitable_properties(&self, preferred_dimensions: [u32; 2]) -> SwapchainProperties {
@@ -148,8 +163,8 @@ pub struct Swapchain {
 }
 
 impl Swapchain {
-    pub fn new(context: Arc<VulkanContext>, dimensions: [u32; 2]) -> Swapchain {
-        let swapchain_support_details = SwapchainSupportDetails::new(&context);
+    pub fn new(context: Arc<VulkanContext>, dimensions: [u32; 2]) -> Result<Swapchain> {
+        let swapchain_support_details = SwapchainSupportDetails::new(&context)?;
         let capabilities = &swapchain_support_details.capabilities;
 
         let swapchain_properties = swapchain_support_details.suitable_properties(dimensions);
@@ -252,13 +267,15 @@ Creating swapchain.
             })
             .collect::<Vec<_>>();
 
-        Swapchain {
+        let swapchain = Swapchain {
             swapchain,
             swapchain_khr,
             swapchain_properties,
             images: images.to_vec(),
             image_views,
-        }
+        };
+
+        Ok(swapchain)
     }
 
     pub fn properties(&self) -> &SwapchainProperties {
