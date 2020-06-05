@@ -1,8 +1,19 @@
 use crate::vulkan::VulkanContext;
 use ash::{version::DeviceV1_0, vk};
+use snafu::{ResultExt, Snafu};
 use std::sync::Arc;
 
-// TODO: Add snafu errors
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility = "pub(crate)")]
+pub enum Error {
+    #[snafu(display("Failed to create descriptor pool: {}", source))]
+    CreateDescriptorPool { source: ash::vk::Result },
+
+    #[snafu(display("Failed to allocate descriptor sets: {}", source))]
+    AllocateDescriptorSets { source: ash::vk::Result },
+}
 
 pub struct DescriptorPool {
     pool: vk::DescriptorPool,
@@ -10,23 +21,28 @@ pub struct DescriptorPool {
 }
 
 impl DescriptorPool {
-    pub fn new(context: Arc<VulkanContext>, pool_info: vk::DescriptorPoolCreateInfo) -> Self {
+    pub fn new(
+        context: Arc<VulkanContext>,
+        pool_info: vk::DescriptorPoolCreateInfo,
+    ) -> Result<Self> {
         let pool = unsafe {
             context
                 .logical_device()
                 .logical_device()
                 .create_descriptor_pool(&pool_info, None)
-                .expect("Failed to create descriptor pool!")
-        };
+        }
+        .context(CreateDescriptorPool {})?;
 
-        DescriptorPool { pool, context }
+        let descriptor_pool = Self { pool, context };
+
+        Ok(descriptor_pool)
     }
 
     pub fn allocate_descriptor_sets(
         &self,
         layout: vk::DescriptorSetLayout,
         number_of_sets: u32,
-    ) -> Vec<vk::DescriptorSet> {
+    ) -> Result<Vec<vk::DescriptorSet>> {
         let layouts = (0..number_of_sets).map(|_| layout).collect::<Vec<_>>();
         let allocation_info = vk::DescriptorSetAllocateInfo::builder()
             .descriptor_pool(self.pool)
@@ -37,8 +53,8 @@ impl DescriptorPool {
                 .logical_device()
                 .logical_device()
                 .allocate_descriptor_sets(&allocation_info)
-                .expect("Failed to allocate descriptor sets!")
         }
+        .context(AllocateDescriptorSets {})
     }
 }
 

@@ -62,8 +62,9 @@ impl PrefilterMap {
 
         let descriptor_set_layout = Self::create_descriptor_set_layout(context.clone());
         let descriptor_pool = Self::create_descriptor_pool(context.clone());
-        let descriptor_set =
-            descriptor_pool.allocate_descriptor_sets(descriptor_set_layout.layout(), 1)[0];
+        let descriptor_set = descriptor_pool
+            .allocate_descriptor_sets(descriptor_set_layout.layout(), 1)
+            .unwrap()[0];
 
         Self::update_descriptor_set(context.clone(), descriptor_set, &cubemap);
 
@@ -380,7 +381,7 @@ impl PrefilterMap {
             .max_sets(2)
             .build();
 
-        DescriptorPool::new(context, pool_info)
+        DescriptorPool::new(context, pool_info).unwrap()
     }
 
     fn update_descriptor_set(

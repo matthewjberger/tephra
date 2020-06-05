@@ -251,8 +251,9 @@ impl ModelPipelineData {
     pub fn new(context: Arc<VulkanContext>) -> Self {
         let descriptor_set_layout = Self::descriptor_set_layout(context.clone());
         let descriptor_pool = Self::create_descriptor_pool(context.clone());
-        let descriptor_set =
-            descriptor_pool.allocate_descriptor_sets(descriptor_set_layout.layout(), 1)[0];
+        let descriptor_set = descriptor_pool
+            .allocate_descriptor_sets(descriptor_set_layout.layout(), 1)
+            .unwrap()[0];
 
         let uniform_buffer = Buffer::new_mapped_basic(
             context.clone(),
@@ -304,7 +305,7 @@ impl ModelPipelineData {
             .max_sets(1)
             .build();
 
-        DescriptorPool::new(context, pool_info)
+        DescriptorPool::new(context, pool_info).unwrap()
     }
 
     fn update_descriptor_set(&self, context: Arc<VulkanContext>) {
