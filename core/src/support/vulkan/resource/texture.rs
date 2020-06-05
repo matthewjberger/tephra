@@ -82,9 +82,19 @@ pub enum Error {
         source: crate::vulkan::image_view::Error,
     },
 
+    #[snafu(display("Failed to create sampler: {}", source))]
+    CreateSampler {
+        source: crate::vulkan::sampler::Error,
+    },
+
     #[snafu(display("Failed to create cubemap image view: {}", source))]
     CreateCubemapImageView {
         source: crate::vulkan::image_view::Error,
+    },
+
+    #[snafu(display("Failed to create cubemap sampler: {}", source))]
+    CreateCubemapSampler {
+        source: crate::vulkan::sampler::Error,
     },
 }
 
@@ -591,7 +601,7 @@ impl Cubemap {
         let description = TextureDescription::empty(dimension, dimension, format);
         let texture = Self::create_texture(context.clone(), &description)?;
         let view = Self::create_view(context.clone(), &texture, &description)?;
-        let sampler = Self::create_sampler(context.clone(), &description);
+        let sampler = Self::create_sampler(context.clone(), &description)?;
 
         let cubemap = Self {
             texture,
@@ -634,7 +644,7 @@ impl Cubemap {
             src_stage_mask: vk::PipelineStageFlags::TOP_OF_PIPE,
             dst_stage_mask: vk::PipelineStageFlags::TRANSFER,
         };
-        self.transition(&command_pool, &transition);
+        self.transition(&command_pool, &transition)?;
 
         let mut offset = 0;
         let regions = descriptions
@@ -673,7 +683,7 @@ impl Cubemap {
             src_stage_mask: vk::PipelineStageFlags::TRANSFER,
             dst_stage_mask: vk::PipelineStageFlags::FRAGMENT_SHADER,
         };
-        self.transition(&command_pool, &transition);
+        self.transition(&command_pool, &transition)?;
 
         Ok(())
     }
@@ -735,10 +745,14 @@ impl Cubemap {
                 layer_count: 6,
             })
             .build();
-        ImageView::new(context, create_info).context(CreateCubemapImageView {})
+        let image_view = ImageView::new(context, create_info).context(CreateCubemapImageView {})?;
+        Ok(image_view)
     }
 
-    fn create_sampler(context: Arc<VulkanContext>, description: &TextureDescription) -> Sampler {
+    fn create_sampler(
+        context: Arc<VulkanContext>,
+        description: &TextureDescription,
+    ) -> Result<Sampler> {
         let sampler_info = vk::SamplerCreateInfo::builder()
             .mag_filter(vk::Filter::LINEAR)
             .min_filter(vk::Filter::LINEAR)
@@ -756,11 +770,16 @@ impl Cubemap {
             .min_lod(0.0)
             .max_lod(description.mip_levels as _)
             .build();
-        Sampler::new(context, sampler_info)
+        let sampler = Sampler::new(context, sampler_info).context(CreateSampler {})?;
+        Ok(sampler)
     }
 
     // TODO: Merge this with the texture transition
-    pub fn transition(&self, command_pool: &CommandPool, transition: &ImageLayoutTransition) {
+    pub fn transition(
+        &self,
+        command_pool: &CommandPool,
+        transition: &ImageLayoutTransition,
+    ) -> Result<()> {
         let barrier = vk::ImageMemoryBarrier::builder()
             .old_layout(transition.old_layout)
             .new_layout(transition.new_layout)
@@ -785,7 +804,9 @@ impl Cubemap {
                 transition.src_stage_mask,
                 transition.dst_stage_mask,
             )
-            .unwrap();
+            .context(TransitionImageLayout {})?;
+
+        Ok(())
     }
 }
 
@@ -807,7 +828,7 @@ impl TextureBundle {
 
         let view = Self::create_image_view(context.clone(), &texture, &description)?;
 
-        let sampler = Self::create_sampler(context, description.mip_levels);
+        let sampler = Self::create_sampler(context, description.mip_levels)?;
 
         let texture_bundle = Self {
             texture,
@@ -878,7 +899,7 @@ impl TextureBundle {
         ImageView::new(context, create_info).context(CreateImageView {})
     }
 
-    fn create_sampler(context: Arc<VulkanContext>, mip_levels: u32) -> Sampler {
+    fn create_sampler(context: Arc<VulkanContext>, mip_levels: u32) -> Result<Sampler> {
         let sampler_info = vk::SamplerCreateInfo::builder()
             .mag_filter(vk::Filter::LINEAR)
             .min_filter(vk::Filter::LINEAR)
@@ -896,6 +917,6 @@ impl TextureBundle {
             .min_lod(0.0)
             .max_lod(mip_levels as _)
             .build();
-        Sampler::new(context, sampler_info)
+        Sampler::new(context, sampler_info).context(CreateCubemapSampler {})
     }
 }

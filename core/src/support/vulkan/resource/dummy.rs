@@ -84,7 +84,7 @@ impl DummyImage {
             .min_lod(0.0)
             .max_lod(1.0)
             .build();
-        let sampler = Sampler::new(context, sampler_info);
+        let sampler = Sampler::new(context, sampler_info).unwrap();
 
         let barrier = vk::ImageMemoryBarrier::builder()
             .old_layout(vk::ImageLayout::UNDEFINED)

@@ -194,7 +194,9 @@ impl HdrCubemap {
             src_stage_mask: vk::PipelineStageFlags::ALL_COMMANDS,
             dst_stage_mask: vk::PipelineStageFlags::ALL_COMMANDS,
         };
-        output_cubemap.transition(&command_pool, &transition);
+        output_cubemap
+            .transition(&command_pool, &transition)
+            .unwrap();
 
         let mut viewport = vk::Viewport {
             x: 0.0,
@@ -338,7 +340,9 @@ impl HdrCubemap {
             dst_stage_mask: vk::PipelineStageFlags::ALL_COMMANDS,
         };
 
-        output_cubemap.transition(&command_pool, &transition);
+        output_cubemap
+            .transition(&command_pool, &transition)
+            .unwrap();
 
         let hdr = Self {
             cubemap: output_cubemap,

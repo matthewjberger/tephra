@@ -171,7 +171,7 @@ impl Brdflut {
             .min_lod(0.0)
             .max_lod(1.0)
             .build();
-        Sampler::new(context, sampler_info)
+        Sampler::new(context, sampler_info).unwrap()
     }
 
     fn create_render_pass(context: Arc<VulkanContext>, format: vk::Format) -> RenderPass {
