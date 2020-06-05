@@ -11,6 +11,8 @@ use std::{
     os::raw::c_void,
 };
 
+use log::{debug, error, info, trace, warn};
+
 use snafu::{ResultExt, Snafu};
 
 type Result<T, E = DebugLayerError> = std::result::Result<T, E>;
@@ -126,19 +128,16 @@ impl LayerNameVec {
 
 // Setup the callback for the debug utils extension
 unsafe extern "system" fn vulkan_debug_callback(
-    _flags: DebugUtilsMessageSeverityFlagsEXT,
+    flags: DebugUtilsMessageSeverityFlagsEXT,
     type_flags: DebugUtilsMessageTypeFlagsEXT,
     p_callback_data: *const DebugUtilsMessengerCallbackDataEXT,
     _: *mut c_void,
 ) -> Bool32 {
-    let type_flag = if type_flags == DebugUtilsMessageTypeFlagsEXT::GENERAL {
-        "General"
-    } else if type_flags == DebugUtilsMessageTypeFlagsEXT::PERFORMANCE {
-        "Performance"
-    } else if type_flags == DebugUtilsMessageTypeFlagsEXT::VALIDATION {
-        "Validation"
-    } else {
-        unreachable!()
+    let type_flag = match type_flags {
+        DebugUtilsMessageTypeFlagsEXT::GENERAL => "General",
+        DebugUtilsMessageTypeFlagsEXT::PERFORMANCE => "Performance",
+        DebugUtilsMessageTypeFlagsEXT::VALIDATION => "Validation",
+        _ => "Unspecified",
     };
 
     let message = format!(
@@ -147,18 +146,13 @@ unsafe extern "system" fn vulkan_debug_callback(
         CStr::from_ptr((*p_callback_data).p_message)
     );
 
-    // TODO: Use a proper logger here with various log levels
-    // if flags == DebugUtilsMessageSeverityFlagsEXT::ERROR {
-    //     eprintln!("{}", message);
-    // } else if flags == DebugUtilsMessageSeverityFlagsEXT::INFO {
-    //     println!("{}", message);
-    // } else if flags == DebugUtilsMessageSeverityFlagsEXT::WARNING {
-    //     println!("{}", message);
-    // } else if flags == DebugUtilsMessageSeverityFlagsEXT::VERBOSE {
-    //     println!("{}", message);
-    // }
-
-    println!("{}", message);
+    match flags {
+        DebugUtilsMessageSeverityFlagsEXT::ERROR => error!("{}", message),
+        DebugUtilsMessageSeverityFlagsEXT::INFO => info!("{}", message),
+        DebugUtilsMessageSeverityFlagsEXT::WARNING => warn!("{}", message),
+        DebugUtilsMessageSeverityFlagsEXT::VERBOSE => trace!("{}", message),
+        _ => debug!("{}", message),
+    }
 
     vk::FALSE
 }

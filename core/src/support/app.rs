@@ -3,7 +3,7 @@ use crate::{
     vulkan::{Renderer, VulkanContext},
 };
 use nalgebra_glm as glm;
-use std::{boxed::Box, error::Error, sync::Arc, time::Instant};
+use std::{boxed::Box, error::Error, fs::File, sync::Arc, time::Instant};
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
     event::{
@@ -13,6 +13,9 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
+
+use log::info;
+use simplelog::*;
 
 #[derive(Default)]
 pub struct Dimensions {
@@ -71,6 +74,18 @@ pub trait App {
 }
 
 pub fn setup_app(title: &str) -> (Window, EventLoop<()>, Renderer) {
+    CombinedLogger::init(vec![
+        TermLogger::new(LevelFilter::max(), Config::default(), TerminalMode::Mixed),
+        WriteLogger::new(
+            LevelFilter::Info,
+            Config::default(),
+            File::create("tephra.log").unwrap(),
+        ),
+    ])
+    .expect("Failed to create logger backend!");
+
+    info!("Setting up app.");
+
     let (width, height) = (1920, 1080);
 
     let event_loop = EventLoop::new();
