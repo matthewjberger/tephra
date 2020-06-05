@@ -41,6 +41,30 @@ impl RenderPass {
     pub fn render_pass(&self) -> vk::RenderPass {
         self.render_pass
     }
+
+    pub fn record<T>(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        render_pass_begin_info: &vk::RenderPassBeginInfo,
+        mut action: T,
+    ) where
+        T: FnMut(),
+    {
+        let device = self.context.logical_device().logical_device();
+        unsafe {
+            device.cmd_begin_render_pass(
+                command_buffer,
+                render_pass_begin_info,
+                vk::SubpassContents::INLINE,
+            )
+        };
+
+        action();
+
+        unsafe {
+            device.cmd_end_render_pass(command_buffer);
+        }
+    }
 }
 
 impl Drop for RenderPass {

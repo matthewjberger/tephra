@@ -90,6 +90,33 @@ impl LogicalDevice {
                 .cmd_set_scissor(command_buffer, 0, &scissors);
         }
     }
+
+    pub fn record_command_buffer<T>(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        usage: vk::CommandBufferUsageFlags,
+        mut action: T,
+    ) where
+        T: FnMut(),
+    {
+        let command_buffer_begin_info = vk::CommandBufferBeginInfo::builder().flags(usage).build();
+
+        let device = &self.logical_device;
+
+        unsafe {
+            device
+                .begin_command_buffer(command_buffer, &command_buffer_begin_info)
+                .expect("Failed to begin command buffer for the render pass!")
+        };
+
+        action();
+
+        unsafe {
+            device
+                .end_command_buffer(command_buffer)
+                .expect("Failed to end the command buffer for a render pass!");
+        }
+    }
 }
 
 impl Drop for LogicalDevice {

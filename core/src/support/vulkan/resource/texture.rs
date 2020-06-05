@@ -96,6 +96,11 @@ pub enum Error {
     CreateCubemapSampler {
         source: crate::vulkan::sampler::Error,
     },
+
+    #[snafu(display("Failed to copy buffer to image: {}", source))]
+    CopyBufferToImage {
+        source: crate::vulkan::command_pool::Error,
+    },
 }
 
 pub struct ImageLayoutTransition {
@@ -330,7 +335,9 @@ impl Texture {
         };
         self.transition(&command_pool, &transition, description.mip_levels)?;
 
-        command_pool.copy_buffer_to_image(buffer.buffer(), self.image(), &regions);
+        command_pool
+            .copy_buffer_to_image(buffer.buffer(), self.image(), &regions)
+            .unwrap();
 
         self.generate_mipmaps(&command_pool, &description)?;
 
@@ -673,7 +680,9 @@ impl Cubemap {
             })
             .collect::<Vec<_>>();
 
-        command_pool.copy_buffer_to_image(buffer.buffer(), self.texture.image(), &regions);
+        command_pool
+            .copy_buffer_to_image(buffer.buffer(), self.texture.image(), &regions)
+            .context(CopyBufferToImage {})?;
 
         let transition = ImageLayoutTransition {
             old_layout: vk::ImageLayout::TRANSFER_DST_OPTIMAL,

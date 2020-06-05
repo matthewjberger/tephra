@@ -140,7 +140,8 @@ impl CommandPool {
             staging_buffer.buffer(),
             device_local_buffer.buffer(),
             &regions,
-        );
+        )
+        .unwrap();
 
         device_local_buffer
     }
@@ -185,7 +186,7 @@ impl CommandPool {
         source_layout: vk::ImageLayout,
         destination_layout: vk::ImageLayout,
         regions: &[vk::ImageCopy],
-    ) {
+    ) -> Result<()> {
         self.execute_command_once(self.context.graphics_queue(), |command_buffer| {
             unsafe {
                 self.context
@@ -201,7 +202,6 @@ impl CommandPool {
                     )
             };
         })
-        .unwrap();
     }
 
     pub fn copy_buffer_to_buffer(
@@ -209,7 +209,7 @@ impl CommandPool {
         source: vk::Buffer,
         destination: vk::Buffer,
         regions: &[vk::BufferCopy],
-    ) {
+    ) -> Result<()> {
         self.execute_command_once(self.context.graphics_queue(), |command_buffer| {
             unsafe {
                 self.context
@@ -218,7 +218,6 @@ impl CommandPool {
                     .cmd_copy_buffer(command_buffer, source, destination, &regions)
             };
         })
-        .unwrap();
     }
 
     pub fn copy_buffer_to_image(
@@ -226,7 +225,7 @@ impl CommandPool {
         buffer: vk::Buffer,
         image: vk::Image,
         regions: &[vk::BufferImageCopy],
-    ) {
+    ) -> Result<()> {
         self.execute_command_once(self.context.graphics_queue(), |command_buffer| unsafe {
             self.context
                 .logical_device()
@@ -239,16 +238,14 @@ impl CommandPool {
                     regions,
                 )
         })
-        .unwrap();
     }
 
     // TODO: Refactor this to be smaller. Functionality can probably be reused
     // in generic command buffer submission method
-    pub fn execute_command_once<F: FnOnce(vk::CommandBuffer)>(
-        &self,
-        queue: vk::Queue,
-        executor: F,
-    ) -> Result<()> {
+    pub fn execute_command_once<T>(&self, queue: vk::Queue, mut executor: T) -> Result<()>
+    where
+        T: FnMut(vk::CommandBuffer),
+    {
         // Allocate a command buffer using the command pool
         let command_buffer = {
             let allocation_info = vk::CommandBufferAllocateInfo::builder()
@@ -267,24 +264,13 @@ impl CommandPool {
         }?[0];
         let command_buffers = [command_buffer];
 
-        let begin_info = vk::CommandBufferBeginInfo::builder()
-            .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT)
-            .build();
-        let logical_device = self.context.logical_device().logical_device();
-
-        unsafe {
-            logical_device
-                .begin_command_buffer(command_buffer, &begin_info)
-                .context(BeginCommandBufferRecording {})?
-        };
-
-        executor(command_buffer);
-
-        unsafe {
-            logical_device
-                .end_command_buffer(command_buffer)
-                .context(EndCommandBufferRecording {})?
-        };
+        self.context.logical_device().record_command_buffer(
+            command_buffer,
+            vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT,
+            || {
+                executor(command_buffer);
+            },
+        );
 
         // Build the submission info
         let submit_info = vk::SubmitInfo::builder()
@@ -295,6 +281,8 @@ impl CommandPool {
         // Create a fence to ensure that the command buffer has finished executing
         let fence = Fence::new(self.context.clone(), vk::FenceCreateFlags::empty())
             .context(CreateOneTimeFence {})?;
+
+        let logical_device = self.context.logical_device().logical_device();
 
         unsafe {
             // Submit the command buffer

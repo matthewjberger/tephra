@@ -2,7 +2,7 @@ use crate::vulkan::{
     core::sync::synchronization_set::SynchronizationSetConstants, CommandPool, SynchronizationSet,
     VulkanContext, VulkanSwapchain,
 };
-use ash::{version::DeviceV1_0, vk};
+use ash::vk;
 use nalgebra_glm as glm;
 use std::{boxed::Box, error::Error, sync::Arc};
 use winit::window::Window;
@@ -182,17 +182,6 @@ impl Renderer {
         command_buffer: vk::CommandBuffer,
         command: &mut dyn Command,
     ) {
-        let device = self.context.logical_device().logical_device();
-
-        let command_buffer_begin_info = vk::CommandBufferBeginInfo::builder()
-            .flags(vk::CommandBufferUsageFlags::SIMULTANEOUS_USE)
-            .build();
-        unsafe {
-            device
-                .begin_command_buffer(command_buffer, &command_buffer_begin_info)
-                .expect("Failed to begin command buffer for the render pass!")
-        };
-
         let clear_values = [
             vk::ClearValue {
                 color: vk::ClearColorValue {
@@ -207,45 +196,38 @@ impl Renderer {
             },
         ];
 
-        let render_pass_begin_info = vk::RenderPassBeginInfo::builder()
-            .render_pass(self.vulkan_swapchain().render_pass.render_pass())
-            .framebuffer(framebuffer)
-            .render_area(vk::Rect2D {
-                offset: vk::Offset2D { x: 0, y: 0 },
-                extent: self.vulkan_swapchain().swapchain.properties().extent,
-            })
-            .clear_values(&clear_values)
-            .build();
+        let device = self.context.logical_device().logical_device();
 
-        unsafe {
-            device.cmd_begin_render_pass(
-                command_buffer,
-                &render_pass_begin_info,
-                vk::SubpassContents::INLINE,
-            );
-        }
+        self.context.logical_device().record_command_buffer(
+            command_buffer,
+            vk::CommandBufferUsageFlags::SIMULTANEOUS_USE,
+            || {
+                let render_pass_begin_info = vk::RenderPassBeginInfo::builder()
+                    .render_pass(self.vulkan_swapchain().render_pass.render_pass())
+                    .framebuffer(framebuffer)
+                    .render_area(vk::Rect2D {
+                        offset: vk::Offset2D { x: 0, y: 0 },
+                        extent: self.vulkan_swapchain().swapchain.properties().extent,
+                    })
+                    .clear_values(&clear_values)
+                    .build();
 
-        let extent = self.vulkan_swapchain().swapchain.properties().extent;
-        self.context
-            .logical_device()
-            .update_viewport(command_buffer, extent);
+                self.vulkan_swapchain().render_pass.record(
+                    command_buffer,
+                    &render_pass_begin_info,
+                    || {
+                        let extent = self.vulkan_swapchain().swapchain.properties().extent;
+                        self.context
+                            .logical_device()
+                            .update_viewport(command_buffer, extent);
 
-        command
-            .issue_commands(device, command_buffer)
-            .expect("Failed to issue vulkan commands!");
-
-        unsafe {
-            self.context
-                .logical_device()
-                .logical_device()
-                .cmd_end_render_pass(command_buffer);
-
-            self.context
-                .logical_device()
-                .logical_device()
-                .end_command_buffer(command_buffer)
-                .expect("Failed to end the command buffer for a render pass!");
-        }
+                        command
+                            .issue_commands(device, command_buffer)
+                            .expect("Failed to issue vulkan commands!");
+                    },
+                );
+            },
+        );
     }
 }
 

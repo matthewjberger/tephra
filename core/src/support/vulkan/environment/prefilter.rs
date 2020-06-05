@@ -171,45 +171,40 @@ impl PrefilterMap {
                         device.cmd_set_scissor(command_buffer, 0, &scissors);
 
                         // Render scene from cube face's pov
-                        device.cmd_begin_render_pass(
-                            command_buffer,
-                            &render_pass_begin_info,
-                            vk::SubpassContents::INLINE,
-                        );
+                        render_pass.record(command_buffer, &render_pass_begin_info, || {
+                            let push_block_irradiance = PushBlockPrefilterEnv {
+                                mvp: glm::perspective_zo(1.0, 90_f32.to_radians(), 0.1, 512.0)
+                                    * matrix,
+                                roughness: mip_level as f32
+                                    / (output_cubemap.description.mip_levels - 1) as f32,
+                                num_samples: 32,
+                            };
 
-                        let push_block_irradiance = PushBlockPrefilterEnv {
-                            mvp: glm::perspective_zo(1.0, 90_f32.to_radians(), 0.1, 512.0) * matrix,
-                            roughness: mip_level as f32
-                                / (output_cubemap.description.mip_levels - 1) as f32,
-                            num_samples: 32,
-                        };
+                            device.cmd_push_constants(
+                                command_buffer,
+                                pipeline.layout(),
+                                vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                                0,
+                                byte_slice_from(&push_block_irradiance),
+                            );
 
-                        device.cmd_push_constants(
-                            command_buffer,
-                            pipeline.layout(),
-                            vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-                            0,
-                            byte_slice_from(&push_block_irradiance),
-                        );
+                            device.cmd_bind_pipeline(
+                                command_buffer,
+                                vk::PipelineBindPoint::GRAPHICS,
+                                pipeline.pipeline(),
+                            );
 
-                        device.cmd_bind_pipeline(
-                            command_buffer,
-                            vk::PipelineBindPoint::GRAPHICS,
-                            pipeline.pipeline(),
-                        );
+                            device.cmd_bind_descriptor_sets(
+                                command_buffer,
+                                vk::PipelineBindPoint::GRAPHICS,
+                                pipeline.layout(),
+                                0,
+                                &[descriptor_set],
+                                &[],
+                            );
 
-                        device.cmd_bind_descriptor_sets(
-                            command_buffer,
-                            vk::PipelineBindPoint::GRAPHICS,
-                            pipeline.layout(),
-                            0,
-                            &[descriptor_set],
-                            &[],
-                        );
-
-                        unit_cube.draw(device, command_buffer);
-
-                        device.cmd_end_render_pass(command_buffer);
+                            unit_cube.draw(device, command_buffer);
+                        });
                     })
                     .unwrap();
 
@@ -253,13 +248,15 @@ impl PrefilterMap {
                     .build();
                 let regions = [region];
 
-                command_pool.copy_image_to_image(
-                    offscreen.texture.image(),
-                    output_cubemap.texture.image(),
-                    vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                    vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                    &regions,
-                );
+                command_pool
+                    .copy_image_to_image(
+                        offscreen.texture.image(),
+                        output_cubemap.texture.image(),
+                        vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                        vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                        &regions,
+                    )
+                    .unwrap();
 
                 let transition = ImageLayoutTransition {
                     old_layout: vk::ImageLayout::TRANSFER_SRC_OPTIMAL,

@@ -57,12 +57,6 @@ impl Brdflut {
 
         command_pool
             .execute_command_once(context.graphics_queue(), |command_buffer| unsafe {
-                device.cmd_begin_render_pass(
-                    command_buffer,
-                    &render_pass_begin_info,
-                    vk::SubpassContents::INLINE,
-                );
-
                 let viewport = vk::Viewport {
                     x: 0.0,
                     y: 0.0,
@@ -82,14 +76,14 @@ impl Brdflut {
                 device.cmd_set_viewport(command_buffer, 0, &viewports);
                 device.cmd_set_scissor(command_buffer, 0, &scissors);
 
-                device.cmd_bind_pipeline(
-                    command_buffer,
-                    vk::PipelineBindPoint::GRAPHICS,
-                    pipeline.pipeline(),
-                );
-                device.cmd_draw(command_buffer, 3, 1, 0, 0);
-
-                device.cmd_end_render_pass(command_buffer);
+                render_pass.record(command_buffer, &render_pass_begin_info, || {
+                    device.cmd_bind_pipeline(
+                        command_buffer,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        pipeline.pipeline(),
+                    );
+                    device.cmd_draw(command_buffer, 3, 1, 0, 0);
+                });
             })
             .unwrap();
 
