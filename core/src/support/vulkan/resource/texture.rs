@@ -76,6 +76,16 @@ pub enum Error {
     TransitionImageLayout {
         source: crate::vulkan::command_pool::Error,
     },
+
+    #[snafu(display("Failed to create image view: {}", source))]
+    CreateImageView {
+        source: crate::vulkan::image_view::Error,
+    },
+
+    #[snafu(display("Failed to create cubemap image view: {}", source))]
+    CreateCubemapImageView {
+        source: crate::vulkan::image_view::Error,
+    },
 }
 
 pub struct ImageLayoutTransition {
@@ -580,7 +590,7 @@ impl Cubemap {
     pub fn new(context: Arc<VulkanContext>, dimension: u32, format: vk::Format) -> Result<Self> {
         let description = TextureDescription::empty(dimension, dimension, format);
         let texture = Self::create_texture(context.clone(), &description)?;
-        let view = Self::create_view(context.clone(), &texture, &description);
+        let view = Self::create_view(context.clone(), &texture, &description)?;
         let sampler = Self::create_sampler(context.clone(), &description);
 
         let cubemap = Self {
@@ -706,7 +716,7 @@ impl Cubemap {
         context: Arc<VulkanContext>,
         texture: &Texture,
         description: &TextureDescription,
-    ) -> ImageView {
+    ) -> Result<ImageView> {
         let create_info = vk::ImageViewCreateInfo::builder()
             .image(texture.image())
             .view_type(vk::ImageViewType::CUBE)
@@ -725,7 +735,7 @@ impl Cubemap {
                 layer_count: 6,
             })
             .build();
-        ImageView::new(context, create_info)
+        ImageView::new(context, create_info).context(CreateCubemapImageView {})
     }
 
     fn create_sampler(context: Arc<VulkanContext>, description: &TextureDescription) -> Sampler {
@@ -795,7 +805,7 @@ impl TextureBundle {
 
         texture.upload_texture_data(&command_pool, &description)?;
 
-        let view = Self::create_image_view(context.clone(), &texture, &description);
+        let view = Self::create_image_view(context.clone(), &texture, &description)?;
 
         let sampler = Self::create_sampler(context, description.mip_levels);
 
@@ -846,7 +856,7 @@ impl TextureBundle {
         context: Arc<VulkanContext>,
         texture: &Texture,
         description: &TextureDescription,
-    ) -> ImageView {
+    ) -> Result<ImageView> {
         let create_info = vk::ImageViewCreateInfo::builder()
             .image(texture.image())
             .view_type(vk::ImageViewType::TYPE_2D)
@@ -865,7 +875,7 @@ impl TextureBundle {
                 layer_count: 1,
             })
             .build();
-        ImageView::new(context, create_info)
+        ImageView::new(context, create_info).context(CreateImageView {})
     }
 
     fn create_sampler(context: Arc<VulkanContext>, mip_levels: u32) -> Sampler {

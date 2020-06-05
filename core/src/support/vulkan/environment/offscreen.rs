@@ -71,6 +71,6 @@ impl Offscreen {
                 layer_count: 1,
             })
             .build();
-        ImageView::new(context, create_info)
+        ImageView::new(context, create_info).unwrap()
     }
 }

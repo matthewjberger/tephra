@@ -218,11 +218,7 @@ Creating swapchain.
     Extent: {:?}
     ImageCount: {}
 "#,
-            surface_format.format,
-            surface_format.color_space,
-            present_mode,
-            extent,
-            image_count
+            surface_format.format, surface_format.color_space, present_mode, extent, image_count
         );
 
         let images = unsafe {
@@ -252,7 +248,7 @@ Creating swapchain.
                     })
                     .build();
 
-                ImageView::new(context.clone(), create_info)
+                ImageView::new(context.clone(), create_info).unwrap()
             })
             .collect::<Vec<_>>();
 

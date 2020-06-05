@@ -1,8 +1,16 @@
 use crate::vulkan::VulkanContext;
 use ash::{version::DeviceV1_0, vk};
+use snafu::{ResultExt, Snafu};
 use std::sync::Arc;
 
-// TODO: Add snafu errors
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility = "pub(crate)")]
+pub enum Error {
+    #[snafu(display("Failed to create image view: {}", source))]
+    CreateImageView { source: ash::vk::Result },
+}
 
 pub struct ImageView {
     view: vk::ImageView,
@@ -10,16 +18,18 @@ pub struct ImageView {
 }
 
 impl ImageView {
-    pub fn new(context: Arc<VulkanContext>, create_info: vk::ImageViewCreateInfo) -> Self {
+    pub fn new(context: Arc<VulkanContext>, create_info: vk::ImageViewCreateInfo) -> Result<Self> {
         let view = unsafe {
             context
                 .logical_device()
                 .logical_device()
                 .create_image_view(&create_info, None)
-                .expect("Failed to create image view!")
-        };
+        }
+        .context(CreateImageView {})?;
 
-        ImageView { view, context }
+        let image_view = ImageView { view, context };
+
+        Ok(image_view)
     }
 
     pub fn view(&self) -> vk::ImageView {

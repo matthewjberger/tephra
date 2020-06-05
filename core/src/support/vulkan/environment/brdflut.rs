@@ -150,7 +150,7 @@ impl Brdflut {
                 layer_count: 1,
             })
             .build();
-        ImageView::new(context, create_info)
+        ImageView::new(context, create_info).unwrap()
     }
 
     fn create_sampler(context: Arc<VulkanContext>) -> Sampler {

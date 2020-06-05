@@ -65,7 +65,7 @@ impl DummyImage {
                 layer_count: 1,
             })
             .build();
-        let view = ImageView::new(context.clone(), create_info);
+        let view = ImageView::new(context.clone(), create_info).unwrap();
 
         let sampler_info = vk::SamplerCreateInfo::builder()
             .mag_filter(vk::Filter::LINEAR)

@@ -281,7 +281,7 @@ impl VulkanSwapchain {
                 layer_count: 1,
             })
             .build();
-        ImageView::new(context, create_info)
+        ImageView::new(context, create_info).unwrap()
     }
 
     fn create_color_texture(
@@ -380,6 +380,6 @@ impl VulkanSwapchain {
                 layer_count: 1,
             })
             .build();
-        ImageView::new(context, create_info)
+        ImageView::new(context, create_info).unwrap()
     }
 }
