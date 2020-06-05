@@ -181,7 +181,7 @@ impl VulkanSwapchain {
                     .height(swapchain.properties().extent.height)
                     .layers(1)
                     .build();
-                Framebuffer::new(context.clone(), create_info)
+                Framebuffer::new(context.clone(), create_info).unwrap()
             })
             .collect::<Vec<_>>()
     }

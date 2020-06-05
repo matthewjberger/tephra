@@ -39,7 +39,7 @@ impl IrradianceMap {
             .height(dimension)
             .layers(1)
             .build();
-        let framebuffer = Framebuffer::new(context.clone(), create_info);
+        let framebuffer = Framebuffer::new(context.clone(), create_info).unwrap();
 
         let transition = ImageLayoutTransition {
             old_layout: vk::ImageLayout::UNDEFINED,

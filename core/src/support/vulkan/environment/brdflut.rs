@@ -28,7 +28,7 @@ impl Brdflut {
             .height(dimension)
             .layers(1)
             .build();
-        let framebuffer = Framebuffer::new(context.clone(), create_info);
+        let framebuffer = Framebuffer::new(context.clone(), create_info).unwrap();
 
         let clear_values = [vk::ClearValue {
             color: vk::ClearColorValue {

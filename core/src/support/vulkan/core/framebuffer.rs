@@ -1,8 +1,16 @@
 use crate::vulkan::VulkanContext;
 use ash::{version::DeviceV1_0, vk};
+use snafu::{ResultExt, Snafu};
 use std::sync::Arc;
 
-// TODO: Add snafu errors
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility = "pub(crate)")]
+pub enum Error {
+    #[snafu(display("Failed to create framebuffer: {}", source))]
+    CreateFrameBuffer { source: ash::vk::Result },
+}
 
 pub struct Framebuffer {
     framebuffer: vk::Framebuffer,
@@ -10,19 +18,24 @@ pub struct Framebuffer {
 }
 
 impl Framebuffer {
-    pub fn new(context: Arc<VulkanContext>, create_info: vk::FramebufferCreateInfo) -> Self {
+    pub fn new(
+        context: Arc<VulkanContext>,
+        create_info: vk::FramebufferCreateInfo,
+    ) -> Result<Self> {
         let framebuffer = unsafe {
             context
                 .logical_device()
                 .logical_device()
                 .create_framebuffer(&create_info, None)
-                .expect("Failed to create framebuffer!")
-        };
+        }
+        .context(CreateFrameBuffer {})?;
 
-        Framebuffer {
+        let framebuffer = Framebuffer {
             framebuffer,
             context,
-        }
+        };
+
+        Ok(framebuffer)
     }
 
     pub fn framebuffer(&self) -> vk::Framebuffer {
