@@ -53,6 +53,29 @@ pub enum Error {
     UploadCubemapImageCopyBuffer {
         source: crate::vulkan::resource::buffer::Error,
     },
+
+    #[snafu(display("Failed to transition mipmap image layout to transfer: {}", source))]
+    TransitionMipLayoutToTransfer {
+        source: crate::vulkan::command_pool::Error,
+    },
+
+    #[snafu(display(
+        "Failed to transition mipmap image layout to fragment shader: {}",
+        source
+    ))]
+    TransitionMipLayoutToFrag {
+        source: crate::vulkan::command_pool::Error,
+    },
+
+    #[snafu(display("Failed to blit from source image to a mipmap: {}", source))]
+    BlitMipMap {
+        source: crate::vulkan::command_pool::Error,
+    },
+
+    #[snafu(display("Failed to transition image layout: {}", source))]
+    TransitionImageLayout {
+        source: crate::vulkan::command_pool::Error,
+    },
 }
 
 pub struct ImageLayoutTransition {
@@ -264,6 +287,7 @@ impl Texture {
             })
             .build();
         let regions = [region];
+
         let buffer = Buffer::new_mapped_basic(
             self.context.clone(),
             self.allocation_info().get_size() as _,
@@ -271,6 +295,7 @@ impl Texture {
             vk_mem::MemoryUsage::CpuToGpu,
         )
         .context(CreateImageCopyBuffer {})?;
+
         buffer
             .upload_to_buffer(&description.pixels, 0)
             .context(UploadImageCopyBuffer {})?;
@@ -283,11 +308,11 @@ impl Texture {
             src_stage_mask: vk::PipelineStageFlags::TOP_OF_PIPE,
             dst_stage_mask: vk::PipelineStageFlags::TRANSFER,
         };
-        self.transition(&command_pool, &transition, description.mip_levels);
+        self.transition(&command_pool, &transition, description.mip_levels)?;
 
         command_pool.copy_buffer_to_image(buffer.buffer(), self.image(), &regions);
 
-        self.generate_mipmaps(&command_pool, &description);
+        self.generate_mipmaps(&command_pool, &description)?;
 
         Ok(())
     }
@@ -296,7 +321,7 @@ impl Texture {
         &self,
         command_pool: &CommandPool,
         texture_description: &TextureDescription,
-    ) {
+    ) -> Result<()> {
         let format_properties = self
             .context
             .physical_device_format_properties(texture_description.format);
@@ -344,11 +369,13 @@ impl Texture {
                 .build();
             let barriers = [barrier];
 
-            command_pool.transition_image_layout(
-                &barriers,
-                vk::PipelineStageFlags::TRANSFER,
-                vk::PipelineStageFlags::TRANSFER,
-            );
+            command_pool
+                .transition_image_layout(
+                    &barriers,
+                    vk::PipelineStageFlags::TRANSFER,
+                    vk::PipelineStageFlags::TRANSFER,
+                )
+                .context(TransitionMipLayoutToTransfer {})?;
 
             let blit = vk::ImageBlit::builder()
                 .src_offsets([
@@ -397,7 +424,7 @@ impl Texture {
                             vk::Filter::LINEAR,
                         )
                 })
-                .unwrap();
+                .context(BlitMipMap {})?;
 
             let barrier = vk::ImageMemoryBarrier::builder()
                 .image(self.image())
@@ -417,11 +444,13 @@ impl Texture {
                 .build();
             let barriers = [barrier];
 
-            command_pool.transition_image_layout(
-                &barriers,
-                vk::PipelineStageFlags::TRANSFER,
-                vk::PipelineStageFlags::FRAGMENT_SHADER,
-            );
+            command_pool
+                .transition_image_layout(
+                    &barriers,
+                    vk::PipelineStageFlags::TRANSFER,
+                    vk::PipelineStageFlags::FRAGMENT_SHADER,
+                )
+                .context(TransitionMipLayoutToFrag {})?;
 
             mip_width = next_mip_width;
             mip_height = next_mip_height;
@@ -445,11 +474,15 @@ impl Texture {
             .build();
         let barriers = [barrier];
 
-        command_pool.transition_image_layout(
-            &barriers,
-            vk::PipelineStageFlags::TRANSFER,
-            vk::PipelineStageFlags::FRAGMENT_SHADER,
-        );
+        command_pool
+            .transition_image_layout(
+                &barriers,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::PipelineStageFlags::FRAGMENT_SHADER,
+            )
+            .context(TransitionMipLayoutToFrag {})?;
+
+        Ok(())
     }
 
     pub fn transition(
@@ -457,7 +490,7 @@ impl Texture {
         command_pool: &CommandPool,
         transition: &ImageLayoutTransition,
         mip_levels: u32,
-    ) {
+    ) -> Result<()> {
         let barrier = vk::ImageMemoryBarrier::builder()
             .old_layout(transition.old_layout)
             .new_layout(transition.new_layout)
@@ -476,11 +509,15 @@ impl Texture {
             .build();
         let barriers = [barrier];
 
-        command_pool.transition_image_layout(
-            &barriers,
-            transition.src_stage_mask,
-            transition.dst_stage_mask,
-        );
+        command_pool
+            .transition_image_layout(
+                &barriers,
+                transition.src_stage_mask,
+                transition.dst_stage_mask,
+            )
+            .context(TransitionImageLayout {})?;
+
+        Ok(())
     }
 
     pub fn image(&self) -> vk::Image {
@@ -732,11 +769,13 @@ impl Cubemap {
             .build();
         let barriers = [barrier];
 
-        command_pool.transition_image_layout(
-            &barriers,
-            transition.src_stage_mask,
-            transition.dst_stage_mask,
-        );
+        command_pool
+            .transition_image_layout(
+                &barriers,
+                transition.src_stage_mask,
+                transition.dst_stage_mask,
+            )
+            .unwrap();
     }
 }
 

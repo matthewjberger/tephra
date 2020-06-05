@@ -19,6 +19,23 @@ pub enum Error {
         source: ash::vk::Result,
         queue: vk::Queue,
     },
+
+    #[snafu(display("Failed to begin command buffer recording: {}", source))]
+    BeginCommandBufferRecording { source: ash::vk::Result },
+
+    #[snafu(display("Failed to end command buffer recording: {}", source))]
+    EndCommandBufferRecording { source: ash::vk::Result },
+
+    #[snafu(display("Failed to create one time fence: {}", source))]
+    CreateOneTimeFence {
+        source: crate::vulkan::sync::fence::Error,
+    },
+
+    #[snafu(display("Failed to wait for one-time fence: {}", source))]
+    WaitForOneTimeFence { source: ash::vk::Result },
+
+    #[snafu(display("Failed to wait for command buffer to be executed: {}", source))]
+    WaitForCommandBuffer { source: ash::vk::Result },
 }
 
 pub struct CommandPool {
@@ -250,7 +267,6 @@ impl CommandPool {
         }?[0];
         let command_buffers = [command_buffer];
 
-        // Begin recording
         let begin_info = vk::CommandBufferBeginInfo::builder()
             .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT)
             .build();
@@ -259,16 +275,15 @@ impl CommandPool {
         unsafe {
             logical_device
                 .begin_command_buffer(command_buffer, &begin_info)
-                .expect("Failed to begin command buffer!")
+                .context(BeginCommandBufferRecording {})?
         };
 
         executor(command_buffer);
 
-        // End command buffer recording
         unsafe {
             logical_device
                 .end_command_buffer(command_buffer)
-                .expect("Failed to end command buffer!")
+                .context(EndCommandBufferRecording {})?
         };
 
         // Build the submission info
@@ -279,22 +294,22 @@ impl CommandPool {
 
         // Create a fence to ensure that the command buffer has finished executing
         let fence = Fence::new(self.context.clone(), vk::FenceCreateFlags::empty())
-            .expect("Failed to create one-time fence!");
+            .context(CreateOneTimeFence {})?;
 
         unsafe {
             // Submit the command buffer
             logical_device
                 .queue_submit(queue, &submit_info_arr, fence.fence())
-                .expect("Failed to submit command buffer to queue!");
+                .context(SubmitCommandBuffer { queue })?;
 
             logical_device
                 .wait_for_fences(&[fence.fence()], true, 100_000_000_000)
-                .expect("Failed to wait for one-time fence!");
+                .context(WaitForOneTimeFence {})?;
 
             // Wait for the command buffer to be executed
             logical_device
                 .queue_wait_idle(queue)
-                .expect("Failed to wait for command buffer to be executed!");
+                .context(WaitForOneTimeFence {})?;
 
             // Free the command buffer
             logical_device.free_command_buffers(self.pool(), &command_buffers);
@@ -303,13 +318,12 @@ impl CommandPool {
         Ok(())
     }
 
-    // TODO: Move this to the texture module
     pub fn transition_image_layout(
         &self,
         barriers: &[vk::ImageMemoryBarrier],
         src_stage_mask: vk::PipelineStageFlags,
         dst_stage_mask: vk::PipelineStageFlags,
-    ) {
+    ) -> Result<()> {
         self.execute_command_once(self.context.graphics_queue(), |command_buffer| {
             unsafe {
                 self.context
@@ -325,8 +339,9 @@ impl CommandPool {
                         &barriers,
                     )
             };
-        })
-        .unwrap();
+        })?;
+
+        Ok(())
     }
 }
 

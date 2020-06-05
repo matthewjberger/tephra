@@ -249,11 +249,13 @@ impl VulkanSwapchain {
             .build();
         let barriers = [barrier];
 
-        command_pool.transition_image_layout(
-            &barriers,
-            vk::PipelineStageFlags::TOP_OF_PIPE,
-            vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS,
-        );
+        command_pool
+            .transition_image_layout(
+                &barriers,
+                vk::PipelineStageFlags::TOP_OF_PIPE,
+                vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS,
+            )
+            .unwrap();
     }
 
     fn create_depth_texture_view(
@@ -346,11 +348,13 @@ impl VulkanSwapchain {
             .build();
         let barriers = [barrier];
 
-        command_pool.transition_image_layout(
-            &barriers,
-            vk::PipelineStageFlags::TOP_OF_PIPE,
-            vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-        );
+        command_pool
+            .transition_image_layout(
+                &barriers,
+                vk::PipelineStageFlags::TOP_OF_PIPE,
+                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+            )
+            .unwrap();
     }
 
     fn create_color_texture_view(

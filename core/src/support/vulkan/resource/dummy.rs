@@ -104,11 +104,13 @@ impl DummyImage {
             .build();
         let barriers = [barrier];
 
-        command_pool.transition_image_layout(
-            &barriers,
-            vk::PipelineStageFlags::TOP_OF_PIPE,
-            vk::PipelineStageFlags::FRAGMENT_SHADER,
-        );
+        command_pool
+            .transition_image_layout(
+                &barriers,
+                vk::PipelineStageFlags::TOP_OF_PIPE,
+                vk::PipelineStageFlags::FRAGMENT_SHADER,
+            )
+            .unwrap();
 
         Self {
             image,

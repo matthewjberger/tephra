@@ -51,11 +51,14 @@ impl PrefilterMap {
             dst_stage_mask: vk::PipelineStageFlags::ALL_COMMANDS,
         };
 
-        offscreen.texture.transition(
-            &command_pool,
-            &transition,
-            output_cubemap.description.mip_levels,
-        );
+        offscreen
+            .texture
+            .transition(
+                &command_pool,
+                &transition,
+                output_cubemap.description.mip_levels,
+            )
+            .unwrap();
 
         let descriptor_set_layout = Self::create_descriptor_set_layout(context.clone());
         let descriptor_pool = Self::create_descriptor_pool(context.clone());
@@ -215,7 +218,10 @@ impl PrefilterMap {
                     src_stage_mask: vk::PipelineStageFlags::ALL_COMMANDS,
                     dst_stage_mask: vk::PipelineStageFlags::ALL_COMMANDS,
                 };
-                offscreen.texture.transition(&command_pool, &transition, 1);
+                offscreen
+                    .texture
+                    .transition(&command_pool, &transition, 1)
+                    .unwrap();
 
                 let src_subresource = vk::ImageSubresourceLayers::builder()
                     .aspect_mask(vk::ImageAspectFlags::COLOR)
@@ -261,7 +267,10 @@ impl PrefilterMap {
                     dst_stage_mask: vk::PipelineStageFlags::ALL_COMMANDS,
                 };
 
-                offscreen.texture.transition(&command_pool, &transition, 1);
+                offscreen
+                    .texture
+                    .transition(&command_pool, &transition, 1)
+                    .unwrap();
             }
         }
 
