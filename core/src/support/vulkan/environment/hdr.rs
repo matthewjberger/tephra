@@ -402,7 +402,7 @@ impl HdrCubemap {
             .dependencies(&subpass_dependencies)
             .build();
 
-        RenderPass::new(context, &create_info)
+        RenderPass::new(context, &create_info).unwrap()
     }
 
     fn create_descriptor_set_layout(context: Arc<VulkanContext>) -> DescriptorSetLayout {

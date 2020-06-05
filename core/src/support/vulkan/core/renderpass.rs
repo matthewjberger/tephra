@@ -1,8 +1,16 @@
 use crate::vulkan::VulkanContext;
 use ash::{version::DeviceV1_0, vk};
+use snafu::{ResultExt, Snafu};
 use std::sync::Arc;
 
-// TODO: Add snafu errors
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility = "pub(crate)")]
+pub enum Error {
+    #[snafu(display("Failed to create render pass: {}", source))]
+    CreateRenderPass { source: ash::vk::Result },
+}
 
 pub struct RenderPass {
     render_pass: vk::RenderPass,
@@ -10,19 +18,24 @@ pub struct RenderPass {
 }
 
 impl RenderPass {
-    pub fn new(context: Arc<VulkanContext>, create_info: &vk::RenderPassCreateInfo) -> Self {
+    pub fn new(
+        context: Arc<VulkanContext>,
+        create_info: &vk::RenderPassCreateInfo,
+    ) -> Result<Self> {
         let render_pass = unsafe {
             context
                 .logical_device()
                 .logical_device()
                 .create_render_pass(&create_info, None)
-                .expect("Failed to create renderpass!")
-        };
+        }
+        .context(CreateRenderPass {})?;
 
-        RenderPass {
+        let render_pass = Self {
             render_pass,
             context,
-        }
+        };
+
+        Ok(render_pass)
     }
 
     pub fn render_pass(&self) -> vk::RenderPass {

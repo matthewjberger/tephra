@@ -230,7 +230,7 @@ impl Brdflut {
             .dependencies(&subpass_dependencies)
             .build();
 
-        RenderPass::new(context, &create_info)
+        RenderPass::new(context, &create_info).unwrap()
     }
 
     fn create_shaders(context: Arc<VulkanContext>) -> (Shader, Shader, CString) {

@@ -153,7 +153,7 @@ impl VulkanSwapchain {
             .dependencies(&subpass_dependencies)
             .build();
 
-        RenderPass::new(context, &create_info)
+        RenderPass::new(context, &create_info).unwrap()
     }
 
     fn create_framebuffers(
