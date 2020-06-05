@@ -266,7 +266,8 @@ impl Brdflut {
         let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::builder()
             .set_layouts(&descriptor_set_layouts)
             .build();
-        let pipeline_layout = PipelineLayout::new(context.clone(), pipeline_layout_create_info);
+        let pipeline_layout =
+            PipelineLayout::new(context.clone(), pipeline_layout_create_info).unwrap();
 
         let input_assembly_create_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
             .topology(vk::PrimitiveTopology::TRIANGLE_LIST)

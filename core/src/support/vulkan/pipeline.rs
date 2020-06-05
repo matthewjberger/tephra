@@ -216,11 +216,11 @@ impl RenderPipeline {
             let pipeline_layout_create_info_builder = vk::PipelineLayoutCreateInfo::builder()
                 .push_constant_ranges(&push_constant_ranges)
                 .set_layouts(&descriptor_set_layouts);
-            PipelineLayout::new(context, pipeline_layout_create_info_builder.build())
+            PipelineLayout::new(context, pipeline_layout_create_info_builder.build()).unwrap()
         } else {
             let pipeline_layout_create_info_builder =
                 vk::PipelineLayoutCreateInfo::builder().set_layouts(&descriptor_set_layouts);
-            PipelineLayout::new(context, pipeline_layout_create_info_builder.build())
+            PipelineLayout::new(context, pipeline_layout_create_info_builder.build()).unwrap()
         }
     }
 

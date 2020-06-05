@@ -426,7 +426,7 @@ impl PrefilterMap {
             .push_constant_ranges(&push_constant_ranges)
             .build();
 
-        PipelineLayout::new(context, pipeline_layout_create_info)
+        PipelineLayout::new(context, pipeline_layout_create_info).unwrap()
     }
 
     fn create_pipeline(
