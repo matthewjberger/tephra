@@ -260,7 +260,8 @@ impl Brdflut {
         let layout_create_info = vk::DescriptorSetLayoutCreateInfo::builder()
             .bindings(&[])
             .build();
-        let descriptor_set_layout = DescriptorSetLayout::new(context.clone(), layout_create_info);
+        let descriptor_set_layout =
+            DescriptorSetLayout::new(context.clone(), layout_create_info).unwrap();
 
         let descriptor_set_layouts = [descriptor_set_layout.layout()];
         let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::builder()

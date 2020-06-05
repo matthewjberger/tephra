@@ -361,7 +361,7 @@ impl PrefilterMap {
             .bindings(&bindings)
             .build();
 
-        DescriptorSetLayout::new(context, layout_create_info)
+        DescriptorSetLayout::new(context, layout_create_info).unwrap()
     }
 
     fn create_descriptor_pool(context: Arc<VulkanContext>) -> DescriptorPool {
