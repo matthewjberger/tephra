@@ -1,6 +1,7 @@
 use crate::vulkan::{CommandPool, TextureBundle, TextureDescription, VulkanContext};
 use ash::vk;
 use gltf::animation::{util::ReadOutputs, Interpolation};
+use log::trace;
 use nalgebra::{Matrix4, Quaternion, UnitQuaternion};
 use nalgebra_glm as glm;
 use petgraph::{
@@ -608,7 +609,7 @@ impl GltfAsset {
     }
 
     pub fn print_nodegraph(graph: &NodeGraph) {
-        println!("{:?}", Dot::with_config(&graph, &[Config::EdgeNoLabel]));
+        trace!("{:?}", Dot::with_config(&graph, &[Config::EdgeNoLabel]));
     }
 
     pub fn calculate_global_transform(node_index: NodeIndex, graph: &NodeGraph) -> glm::Mat4 {

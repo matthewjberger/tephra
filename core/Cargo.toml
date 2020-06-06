@@ -22,6 +22,8 @@ simplelog = { version = "0.8.0", features = ["termcolor"] }
 
 [build-dependencies]
 shader-compilation = { version = "*", path = "../shader-compilation" }
+log = "0.4.8"
+simplelog = { version = "0.8.0", features = ["termcolor"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "0.3.8", features = ["windef", "libloaderapi"] }

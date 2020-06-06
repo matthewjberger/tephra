@@ -1,8 +1,8 @@
 use crate::vulkan::{DebugLayer, Instance, QueueFamilyIndexSet, Surface};
 use ash::{version::InstanceV1_0, vk};
-use std::ffi::CStr;
-
+use log::info;
 use snafu::{ResultExt, Snafu};
+use std::ffi::CStr;
 
 type Result<T, E = PhysicalDeviceError> = std::result::Result<T, E>;
 
@@ -81,7 +81,7 @@ impl PhysicalDevice {
 
         // Log the name of the physical device that was selected
         let props = unsafe { instance.get_physical_device_properties(physical_device) };
-        println!("Selected physical device: {:?}", unsafe {
+        info!("Selected physical device: {:?}", unsafe {
             CStr::from_ptr(props.device_name.as_ptr())
         });
 

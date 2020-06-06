@@ -1,5 +1,6 @@
 use crate::vulkan::{CurrentFrameSynchronization, ImageView, VulkanContext};
 use ash::{extensions::khr::Swapchain as AshSwapchain, vk};
+use log::info;
 use snafu::{ResultExt, Snafu};
 use std::sync::Arc;
 
@@ -224,7 +225,7 @@ impl Swapchain {
                 .expect("Failed to create swapchain")
         };
 
-        println!(
+        info!(
             r#"
 Creating swapchain.
     Format: {:?}

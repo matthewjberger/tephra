@@ -1,4 +1,5 @@
 use glob::glob;
+use log::{error, info};
 use std::{
     error::Error,
     io,
@@ -31,7 +32,7 @@ fn compile_shader(shader_path: &Path) -> Result<()> {
         .ok_or("Failed to convert file_name os_str to string")?
         .replace("glsl", "spv");
 
-    println!("Compiling {:?} -> {:?}", file_name, output_name);
+    info!("Compiling {:?} -> {:?}", file_name, output_name);
     let result = Command::new(SHADER_COMPILER_NAME)
         .current_dir(&parent_name)
         .arg("-V")
@@ -48,19 +49,19 @@ fn compile_shader(shader_path: &Path) -> Result<()> {
 fn display_result(result: std::io::Result<Output>) {
     match result {
         Ok(output) if !output.status.success() => {
-            eprint!(
+            error!(
                 "Shader compilation output: {}",
                 String::from_utf8(output.stdout).unwrap_or_else(|_| {
                     "Failed to convert stdout bytes to UTF-8 string".to_string()
                 })
             );
-            eprintln!("Failed to compile shader: {}", output.status)
+            error!("Failed to compile shader: {}", output.status)
         }
-        Ok(_) => println!("Shader compilation succeeded"),
+        Ok(_) => info!("Shader compilation succeeded"),
         Err(error) if error.kind() == io::ErrorKind::NotFound => panic!(
             "Failed to find the shader compiler program: '{}'",
             SHADER_COMPILER_NAME,
         ),
-        Err(error) => eprintln!("Failed to compile shader: {}", error),
+        Err(error) => error!("Failed to compile shader: {}", error),
     }
 }
