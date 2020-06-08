@@ -110,11 +110,9 @@ impl HdrCubemap {
         let shader_set = Arc::new(
             ShaderSet::new(context.clone())
                 .context(CreateShaderSet {})?
-                .vertex_shader("core/assets/shaders/environment/filtercube.vert.spv")
+                .vertex_shader("assets/shaders/environment/filtercube.vert.spv")
                 .context(CreateShader {})?
-                .fragment_shader(
-                    "core/assets/shaders/environment/equirectangular_to_cubemap.frag.spv",
-                )
+                .fragment_shader("assets/shaders/environment/equirectangular_to_cubemap.frag.spv")
                 .context(CreateShader {})?,
         );
 
@@ -124,7 +122,7 @@ impl HdrCubemap {
             descriptor_set_layout,
             shader_set,
         )
-        .depth_test_enabled(true)
+        .rasterization_samples(vk::SampleCountFlags::TYPE_1)
         .push_constant_range(push_constant_range);
 
         let render_pipeline = RenderPipeline::new(context.clone(), settings);

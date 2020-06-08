@@ -18,6 +18,8 @@ pub struct RenderPipelineSettings {
     pub stencil_back_state: vk::StencilOpState,
     pub push_constant_range: Option<vk::PushConstantRange>,
     pub shader_set: Arc<ShaderSet>,
+    pub rasterization_samples: vk::SampleCountFlags,
+    pub sample_shading_enabled: bool,
 }
 
 impl RenderPipelineSettings {
@@ -38,6 +40,8 @@ impl RenderPipelineSettings {
             stencil_front_state: vk::StencilOpState::default(),
             stencil_back_state: vk::StencilOpState::default(),
             push_constant_range: None,
+            rasterization_samples: vk::SampleCountFlags::TYPE_1,
+            sample_shading_enabled: false,
         }
     }
 
@@ -68,6 +72,16 @@ impl RenderPipelineSettings {
 
     pub fn push_constant_range(mut self, push_constant_range: vk::PushConstantRange) -> Self {
         self.push_constant_range = Some(push_constant_range);
+        self
+    }
+
+    pub fn rasterization_samples(mut self, rasterization_samples: vk::SampleCountFlags) -> Self {
+        self.rasterization_samples = rasterization_samples;
+        self
+    }
+
+    pub fn sample_shading_enabled(mut self, sample_shading_enabled: bool) -> Self {
+        self.sample_shading_enabled = sample_shading_enabled;
         self
     }
 }
@@ -113,8 +127,8 @@ impl RenderPipeline {
             .build();
 
         let multisampling_create_info = vk::PipelineMultisampleStateCreateInfo::builder()
-            .sample_shading_enable(true)
-            .rasterization_samples(context.max_usable_samples())
+            .sample_shading_enable(settings.sample_shading_enabled)
+            .rasterization_samples(settings.rasterization_samples)
             .min_sample_shading(0.2)
             .alpha_to_coverage_enable(false)
             .alpha_to_one_enable(false)

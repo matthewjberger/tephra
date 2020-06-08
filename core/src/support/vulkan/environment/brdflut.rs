@@ -233,7 +233,7 @@ impl Brdflut {
 
         let vertex_shader = Shader::from_file(
             context.clone(),
-            "core/assets/shaders/environment/genbrdflut.vert.spv",
+            "assets/shaders/environment/genbrdflut.vert.spv",
             vk::ShaderStageFlags::VERTEX,
             &shader_entry_point_name,
         )
@@ -241,7 +241,7 @@ impl Brdflut {
 
         let fragment_shader = Shader::from_file(
             context,
-            "core/assets/shaders/environment/genbrdflut.frag.spv",
+            "assets/shaders/environment/genbrdflut.frag.spv",
             vk::ShaderStageFlags::FRAGMENT,
             &shader_entry_point_name,
         )

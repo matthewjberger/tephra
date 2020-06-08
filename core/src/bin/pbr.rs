@@ -1,5 +1,6 @@
 use ash::{version::DeviceV1_0, vk};
 use gltf::material::AlphaMode;
+use log::debug;
 use nalgebra_glm as glm;
 use snafu::{ResultExt, Snafu};
 use std::{boxed::Box, mem, sync::Arc};
@@ -100,22 +101,24 @@ impl App for DemoApp {
         self.camera.position_at(&glm::vec3(0.0, -4.0, -4.0));
         self.camera.look_at(&glm::vec3(0.0, 0.0, 0.0));
 
-        window
-            .set_cursor_position(app_state.window_center())
-            .expect("Failed to set cursor position!");
+        window.set_cursor_position(app_state.window_center())?;
 
+        debug!("Creating Brdflut");
         let brdflut = Brdflut::new(self.context.clone(), &renderer.transient_command_pool);
 
-        let cubemap_path = "core/assets/skyboxes/walk_of_fame/walk_of_fame.hdr";
+        let cubemap_path = "assets/skyboxes/walk_of_fame/walk_of_fame.hdr";
 
+        debug!("Creating HDR cubemap");
         let hdr = HdrCubemap::new(self.context.clone(), &renderer.command_pool, &cubemap_path);
 
+        debug!("Creating Irradiance cubemap");
         let irradiance = IrradianceMap::new(
             self.context.clone(),
             &renderer.transient_command_pool,
             &hdr.as_ref().expect("Failed to get hdr cubemap!").cubemap,
         );
 
+        debug!("Creating Prefilter cubemap");
         let prefilter = PrefilterMap::new(
             self.context.clone(),
             &renderer.transient_command_pool,
@@ -129,10 +132,10 @@ impl App for DemoApp {
         };
 
         let asset_names = vec![
-            "core/assets/models/DamagedHelmet.glb",
-            "core/assets/models/CesiumMan.glb",
-            "core/assets/models/AlphaBlendModeTest.glb",
-            "core/assets/models/MetalRoughSpheres.glb",
+            "assets/models/DamagedHelmet.glb",
+            "assets/models/CesiumMan.glb",
+            "assets/models/AlphaBlendModeTest.glb",
+            "assets/models/MetalRoughSpheres.glb",
         ];
 
         let assets = asset_names
@@ -302,9 +305,7 @@ impl App for DemoApp {
             pbr_data.uniform_buffer.upload_to_buffer(&ubos, 0).unwrap();
         }
 
-        window
-            .set_cursor_position(app_state.window_center())
-            .expect("Failed to set cursor position!");
+        window.set_cursor_position(app_state.window_center())?;
 
         Ok(())
     }
@@ -418,9 +419,9 @@ impl Command for DemoApp {
         let shader_set = Arc::new(
             ShaderSet::new(context.clone())
                 .context(CreateShaderSet {})?
-                .vertex_shader("core/assets/shaders/pbr/pbr.vert.spv")
+                .vertex_shader("assets/shaders/pbr/pbr.vert.spv")
                 .context(CreateShader {})?
-                .fragment_shader("core/assets/shaders/pbr/pbr.frag.spv")
+                .fragment_shader("assets/shaders/pbr/pbr.frag.spv")
                 .context(CreateShader {})?,
         );
 
@@ -433,6 +434,8 @@ impl Command for DemoApp {
             descriptor_set_layout,
             shader_set,
         )
+        .rasterization_samples(context.max_usable_samples())
+        .sample_shading_enabled(true)
         .push_constant_range(push_constant_range);
 
         self.pbr_pipeline = None;

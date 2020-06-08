@@ -56,8 +56,7 @@ impl DebugLayer {
     }
 
     pub fn validation_layers_enabled() -> bool {
-        // Enable validation layers only in debug mode
-        cfg!(debug_assertions)
+        cfg!(feature = "validation") || cfg!(debug_assertions)
     }
 
     pub fn debug_layer_names() -> LayerNameVec {
@@ -75,8 +74,6 @@ impl Drop for DebugLayer {
         }
     }
 }
-
-// TODO: Move LayerName and LayerNameVec out to separate module
 
 pub struct LayerName {
     name: String,

@@ -57,7 +57,7 @@ impl DemoApp {
     pub fn new(context: Arc<VulkanContext>, command_pool: &CommandPool) -> Self {
         Self {
             context: context.clone(),
-            model: ObjModel::new(&command_pool, "core/assets/models/teapot.obj"),
+            model: ObjModel::new(&command_pool, "assets/models/teapot.obj"),
             pipeline: None,
             pipeline_data: ModelPipelineData::new(context),
             rotation: 0.0,
@@ -210,9 +210,9 @@ impl Command for DemoApp {
         let shader_set = Arc::new(
             ShaderSet::new(context.clone())
                 .context(CreateShaderSet {})?
-                .vertex_shader("core/assets/shaders/model/model.vert.spv")
+                .vertex_shader("assets/shaders/model/model.vert.spv")
                 .context(CreateShader {})?
-                .fragment_shader("core/assets/shaders/model/model.frag.spv")
+                .fragment_shader("assets/shaders/model/model.frag.spv")
                 .context(CreateShader {})?,
         );
 
@@ -224,7 +224,8 @@ impl Command for DemoApp {
             vertex_state_info,
             descriptor_set_layout,
             shader_set,
-        );
+        )
+        .rasterization_samples(context.max_usable_samples());
 
         self.pipeline = None;
         self.pipeline = Some(RenderPipeline::new(context, settings));

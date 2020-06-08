@@ -53,11 +53,7 @@ impl PrefilterMap {
 
         offscreen
             .texture
-            .transition(
-                &command_pool,
-                &transition,
-                output_cubemap.description.mip_levels,
-            )
+            .transition(&command_pool, &transition, 1)
             .unwrap();
 
         let descriptor_set_layout = Self::create_descriptor_set_layout(context.clone());
@@ -536,7 +532,7 @@ impl PrefilterMap {
 
         let vertex_shader = Shader::from_file(
             context.clone(),
-            "core/assets/shaders/environment/filtercube.vert.spv",
+            "assets/shaders/environment/filtercube.vert.spv",
             vk::ShaderStageFlags::VERTEX,
             &shader_entry_point_name,
         )
@@ -544,7 +540,7 @@ impl PrefilterMap {
 
         let fragment_shader = Shader::from_file(
             context,
-            "core/assets/shaders/environment/prefilterenvmap.frag.spv",
+            "assets/shaders/environment/prefilterenvmap.frag.spv",
             vk::ShaderStageFlags::FRAGMENT,
             &shader_entry_point_name,
         )
