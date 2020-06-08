@@ -1,5 +1,5 @@
 use crate::vulkan::{
-    DescriptorSetLayout, GraphicsPipeline, PipelineLayout, ShaderSet, VulkanContext,
+    DescriptorSetLayout, GraphicsPipeline, PipelineLayout, RenderPass, ShaderSet, VulkanContext,
 };
 use ash::{version::DeviceV1_0, vk};
 use std::sync::Arc;
@@ -8,11 +8,12 @@ use std::sync::Arc;
 // TODO: Move shader paths into separate struct to be constructed with the builder pattern
 #[derive(Clone)]
 pub struct RenderPipelineSettings {
-    pub render_pass: vk::RenderPass,
+    pub render_pass: Arc<RenderPass>,
     pub vertex_state_info: vk::PipelineVertexInputStateCreateInfo,
     pub descriptor_set_layout: Arc<DescriptorSetLayout>,
     pub blended: bool,
     pub depth_test_enabled: bool,
+    pub depth_write_enabled: bool,
     pub stencil_test_enabled: bool,
     pub stencil_front_state: vk::StencilOpState,
     pub stencil_back_state: vk::StencilOpState,
@@ -20,11 +21,12 @@ pub struct RenderPipelineSettings {
     pub shader_set: Arc<ShaderSet>,
     pub rasterization_samples: vk::SampleCountFlags,
     pub sample_shading_enabled: bool,
+    pub cull_mode: vk::CullModeFlags,
 }
 
 impl RenderPipelineSettings {
     pub fn new(
-        render_pass: vk::RenderPass,
+        render_pass: Arc<RenderPass>,
         vertex_state_info: vk::PipelineVertexInputStateCreateInfo,
         descriptor_set_layout: Arc<DescriptorSetLayout>,
         shader_set: Arc<ShaderSet>,
@@ -36,12 +38,14 @@ impl RenderPipelineSettings {
             shader_set,
             blended: false,
             depth_test_enabled: true,
+            depth_write_enabled: true,
             stencil_test_enabled: false,
             stencil_front_state: vk::StencilOpState::default(),
             stencil_back_state: vk::StencilOpState::default(),
             push_constant_range: None,
             rasterization_samples: vk::SampleCountFlags::TYPE_1,
             sample_shading_enabled: false,
+            cull_mode: vk::CullModeFlags::NONE,
         }
     }
 
@@ -52,6 +56,11 @@ impl RenderPipelineSettings {
 
     pub fn depth_test_enabled(mut self, depth_test_enabled: bool) -> Self {
         self.depth_test_enabled = depth_test_enabled;
+        self
+    }
+
+    pub fn depth_write_enabled(mut self, depth_write_enabled: bool) -> Self {
+        self.depth_write_enabled = depth_write_enabled;
         self
     }
 
@@ -82,6 +91,11 @@ impl RenderPipelineSettings {
 
     pub fn sample_shading_enabled(mut self, sample_shading_enabled: bool) -> Self {
         self.sample_shading_enabled = sample_shading_enabled;
+        self
+    }
+
+    pub fn cull_mode(mut self, cull_mode: vk::CullModeFlags) -> Self {
+        self.cull_mode = cull_mode;
         self
     }
 }
@@ -118,7 +132,7 @@ impl RenderPipeline {
             .rasterizer_discard_enable(false)
             .polygon_mode(vk::PolygonMode::FILL)
             .line_width(1.0)
-            .cull_mode(vk::CullModeFlags::NONE)
+            .cull_mode(settings.cull_mode)
             .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
             .depth_bias_enable(false)
             .depth_bias_constant_factor(0.0)
@@ -136,7 +150,7 @@ impl RenderPipeline {
 
         let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()
             .depth_test_enable(settings.depth_test_enabled)
-            .depth_write_enable(settings.depth_test_enabled)
+            .depth_write_enable(settings.depth_write_enabled)
             .depth_compare_op(vk::CompareOp::LESS_OR_EQUAL)
             .depth_bounds_test_enable(false)
             .min_depth_bounds(0.0)
@@ -182,7 +196,7 @@ impl RenderPipeline {
             .viewport_state(&viewport_create_info)
             .dynamic_state(&dynamic_state_create_info)
             .layout(pipeline_layout.layout())
-            .render_pass(settings.render_pass)
+            .render_pass(settings.render_pass.render_pass())
             .subpass(0)
             .build();
 

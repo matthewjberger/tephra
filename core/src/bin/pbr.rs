@@ -429,7 +429,7 @@ impl Command for DemoApp {
             Arc::new(PbrPipelineData::descriptor_set_layout(context.clone()));
 
         let mut settings = RenderPipelineSettings::new(
-            swapchain.render_pass.render_pass(),
+            swapchain.render_pass.clone(),
             vertex_state_info,
             descriptor_set_layout,
             shader_set,

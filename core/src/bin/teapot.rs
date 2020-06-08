@@ -220,7 +220,7 @@ impl Command for DemoApp {
             Arc::new(ModelPipelineData::descriptor_set_layout(context.clone()));
 
         let settings = RenderPipelineSettings::new(
-            swapchain.render_pass.render_pass(),
+            swapchain.render_pass.clone(),
             vertex_state_info,
             descriptor_set_layout,
             shader_set,

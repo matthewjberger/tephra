@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 pub struct VulkanSwapchain {
     pub swapchain: Swapchain,
-    pub render_pass: RenderPass,
+    pub render_pass: Arc<RenderPass>,
     pub depth_texture: Texture,
     pub depth_texture_view: ImageView,
     pub color_texture: Texture,
@@ -27,8 +27,11 @@ impl VulkanSwapchain {
         );
 
         let swapchain = Swapchain::new(context.clone(), dimensions).unwrap();
-        let render_pass =
-            Self::create_render_pass(context.clone(), &swapchain.properties(), depth_format);
+        let render_pass = Arc::new(Self::create_render_pass(
+            context.clone(),
+            &swapchain.properties(),
+            depth_format,
+        ));
 
         let swapchain_extent = swapchain.properties().extent;
 

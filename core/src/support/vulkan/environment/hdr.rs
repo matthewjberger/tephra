@@ -55,7 +55,7 @@ impl HdrCubemap {
         let format = vk::Format::R32G32B32A32_SFLOAT;
         let output_cubemap = Cubemap::new(context.clone(), dimension, format).unwrap();
 
-        let render_pass = Self::create_render_pass(context.clone(), format);
+        let render_pass = Arc::new(Self::create_render_pass(context.clone(), format));
 
         let offscreen = Offscreen::new(context.clone(), dimension, format);
 
@@ -117,7 +117,7 @@ impl HdrCubemap {
         );
 
         let settings = RenderPipelineSettings::new(
-            render_pass.render_pass(),
+            render_pass.clone(),
             vertex_state_info,
             descriptor_set_layout,
             shader_set,
