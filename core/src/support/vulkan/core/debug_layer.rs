@@ -30,7 +30,6 @@ pub struct DebugLayer {
     debug_utils_messenger: DebugUtilsMessengerEXT,
 }
 
-// TODO: Make the constructor use a Result
 impl DebugLayer {
     pub fn new(instance: &Instance) -> Result<Option<Self>> {
         if !DebugLayer::validation_layers_enabled() {
