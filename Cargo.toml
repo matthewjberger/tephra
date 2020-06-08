@@ -1,6 +1,38 @@
-[workspace]
+[package]
+name = "tephra"
+version = "0.1.0"
+authors = ["Matthew J. Berger <matthewberger@nevada.unr.edu>"]
+edition = "2018"
 
-members = [
-    "core",
-    "shader-compilation",
-]
+[dependencies]
+winit = "0.21"
+nalgebra = "0.21.0"
+nalgebra-glm = "0.7.0"
+vk-mem = "0.2.2"
+snafu = "0.6.7"
+ash = "0.31.0"
+image = "0.23.4"
+gltf = { version = "0.15.2", features = ["names"] }
+glob = "0.3.0"
+raw-window-handle = "0.3.3"
+tobj = "2.0.0"
+petgraph = "0.5.0"
+log = "0.4.8"
+simplelog = { version = "0.8.0", features = ["termcolor"] }
+
+[build-dependencies]
+shader-compilation = { version = "*", path = "shader-compilation" }
+log = "0.4.8"
+simplelog = { version = "0.8.0", features = ["termcolor"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winapi = { version = "0.3.8", features = ["windef", "libloaderapi"] }
+
+[lib]
+name = "support"
+path = "src/support/lib.rs"
+
+
+[features]
+default = []
+validation = []
