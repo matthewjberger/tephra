@@ -9,10 +9,11 @@ use support::{
     byte_slice_from,
     camera::FreeCamera,
     vulkan::{
-        Brdflut, Buffer, Command, CommandPool, DescriptorPool, DescriptorSetLayout, DummyImage,
-        GeometryBuffer, GltfAsset, GraphicsPipeline, HdrCubemap, IrradianceMap, PrefilterMap,
-        Primitive, RenderPass, RenderPipeline, RenderPipelineSettingsBuilder, Renderer,
-        ShaderCache, ShaderSetBuilder, TextureBundle, VulkanContext,
+        create_skybox_pipeline, Brdflut, Buffer, Command, CommandPool, DescriptorPool,
+        DescriptorSetLayout, DummyImage, GeometryBuffer, GltfAsset, GraphicsPipeline, HdrCubemap,
+        IrradianceMap, PrefilterMap, Primitive, RenderPass, RenderPipeline,
+        RenderPipelineSettingsBuilder, Renderer, ShaderCache, ShaderSetBuilder, SkyboxPipelineData,
+        SkyboxRenderer, TextureBundle, VulkanContext,
     },
 };
 use winit::window::Window;
@@ -58,6 +59,8 @@ struct DemoApp {
     context: Arc<VulkanContext>,
     asset_geometry_buffer: Option<GeometryBuffer>,
     environment_maps: Option<EnvironmentMapSet>,
+    skybox_pipeline: Option<RenderPipeline>,
+    skybox_pipeline_data: Option<SkyboxPipelineData>,
     pbr_pipeline: Option<RenderPipeline>,
     pbr_pipeline_blend: Option<RenderPipeline>,
     pbr_pipeline_data: Option<PbrPipelineData>,
@@ -69,6 +72,8 @@ impl DemoApp {
     pub fn new(context: Arc<VulkanContext>) -> Self {
         Self {
             context,
+            skybox_pipeline: None,
+            skybox_pipeline_data: None,
             pbr_pipeline: None,
             pbr_pipeline_blend: None,
             pbr_pipeline_data: None,
@@ -111,7 +116,7 @@ impl App for DemoApp {
         debug!("Creating HDR cubemap");
         let hdr = HdrCubemap::new(
             self.context.clone(),
-            &renderer.command_pool,
+            &renderer.transient_command_pool,
             &cubemap_path,
             &mut renderer.shader_cache,
         );
@@ -120,7 +125,7 @@ impl App for DemoApp {
         let irradiance = IrradianceMap::new(
             self.context.clone(),
             &renderer.transient_command_pool,
-            &hdr.as_ref().expect("Failed to get hdr cubemap!").cubemap,
+            &hdr.as_ref().expect("Failed to lookup hdr cubemap!").cubemap,
         );
 
         debug!("Creating Prefilter cubemap");
@@ -129,6 +134,14 @@ impl App for DemoApp {
             &renderer.transient_command_pool,
             &hdr.as_ref().expect("Failed to lookup hdr cubemap!").cubemap,
         );
+
+        let skybox_pipeline_data = SkyboxPipelineData::new(
+            self.context.clone(),
+            &renderer.transient_command_pool,
+            &hdr.as_ref().expect("Failed to lookup hdr cubemap!").cubemap,
+        );
+
+        self.skybox_pipeline_data = Some(skybox_pipeline_data);
 
         let environment_maps = EnvironmentMapSet {
             brdflut,
@@ -184,7 +197,7 @@ impl App for DemoApp {
             .collect::<Vec<_>>();
 
         let pbr_pipeline_data = PbrPipelineData::new(
-            renderer.context.clone(),
+            self.context.clone(),
             &renderer.transient_command_pool,
             number_of_meshes,
             &textures,
@@ -340,6 +353,25 @@ impl Command for DemoApp {
         device: &ash::Device,
         command_buffer: vk::CommandBuffer,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        // Render skybox
+        let skybox_pipeline = self
+            .skybox_pipeline
+            .as_ref()
+            .expect("Failed to get skybox pipeline!");
+
+        let skybox_pipeline_data = self
+            .skybox_pipeline_data
+            .as_ref()
+            .expect("Failed to get skybox pipeline data!");
+
+        skybox_pipeline.bind(device, command_buffer);
+
+        let skybox_renderer =
+            SkyboxRenderer::new(command_buffer, &skybox_pipeline, &skybox_pipeline_data);
+
+        skybox_renderer.draw(device, &skybox_pipeline_data.cube);
+
+        // Render pbr assets
         let pbr_pipeline = self
             .pbr_pipeline
             .as_ref()
@@ -451,7 +483,7 @@ impl Command for DemoApp {
             Arc::new(PbrPipelineData::descriptor_set_layout(context.clone()));
 
         let mut settings = RenderPipelineSettingsBuilder::default()
-            .render_pass(render_pass)
+            .render_pass(render_pass.clone())
             .vertex_state_info(vertex_state_info)
             .descriptor_set_layout(descriptor_set_layout)
             .shader_set(shader_set)
@@ -465,7 +497,10 @@ impl Command for DemoApp {
         self.pbr_pipeline_blend = None;
         self.pbr_pipeline = Some(RenderPipeline::new(context.clone(), settings.clone()));
         settings.blended = true;
-        self.pbr_pipeline_blend = Some(RenderPipeline::new(context, settings));
+        self.pbr_pipeline_blend = Some(RenderPipeline::new(context.clone(), settings));
+
+        self.skybox_pipeline = None;
+        self.skybox_pipeline = Some(create_skybox_pipeline(context, shader_cache, render_pass));
 
         Ok(())
     }

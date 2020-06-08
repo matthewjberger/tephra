@@ -82,11 +82,7 @@ impl HdrCubemap {
 
         offscreen
             .texture
-            .transition(
-                &command_pool,
-                &transition,
-                output_cubemap.description.mip_levels,
-            )
+            .transition(&command_pool, &transition, 1)
             .unwrap();
 
         let descriptor_set_layout = Arc::new(Self::create_descriptor_set_layout(context.clone()));
@@ -137,7 +133,7 @@ impl HdrCubemap {
             .rasterization_samples(vk::SampleCountFlags::TYPE_1)
             .push_constant_range(push_constant_range)
             .build()
-            .expect("Failed to create render pipeline settings");
+            .expect("Failed to create render pipeline settings!");
 
         let render_pipeline = RenderPipeline::new(context.clone(), settings);
 
