@@ -3,13 +3,13 @@ use crate::{
     vulkan::{
         CommandPool, Cubemap, DescriptorPool, DescriptorSetLayout, Framebuffer,
         ImageLayoutTransition, Offscreen, RenderPass, RenderPipeline,
-        RenderPipelineSettingsBuilder, ShaderSet, TextureBundle, TextureDescription, UnitCube,
-        VulkanContext,
+        RenderPipelineSettingsBuilder, ShaderCache, ShaderSetBuilder, TextureBundle,
+        TextureDescription, UnitCube, VulkanContext,
     },
 };
 use ash::{version::DeviceV1_0, vk};
 use nalgebra_glm as glm;
-use snafu::{ResultExt, Snafu};
+use snafu::Snafu;
 use std::sync::Arc;
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -47,6 +47,7 @@ impl HdrCubemap {
         context: Arc<VulkanContext>,
         command_pool: &CommandPool,
         path: &str,
+        shader_cache: &mut ShaderCache,
     ) -> Result<Self> {
         let description = TextureDescription::from_hdr(path).unwrap();
         let hdr_texture_bundle =
@@ -108,14 +109,25 @@ impl HdrCubemap {
             .size(std::mem::size_of::<PushBlockHdr>() as u32)
             .build();
 
-        let shader_set = Arc::new(
-            ShaderSet::new(context.clone())
-                .context(CreateShaderSet {})?
-                .vertex_shader("assets/shaders/environment/filtercube.vert.spv")
-                .context(CreateShader {})?
-                .fragment_shader("assets/shaders/environment/equirectangular_to_cubemap.frag.spv")
-                .context(CreateShader {})?,
-        );
+        let vertex_path = "assets/shaders/environment/filtercube.vert.spv";
+        let fragment_path = "assets/shaders/environment/equirectangular_to_cubemap.frag.spv";
+
+        shader_cache
+            .add_shader(context.clone(), &vertex_path, vk::ShaderStageFlags::VERTEX)
+            .unwrap();
+        shader_cache
+            .add_shader(
+                context.clone(),
+                &fragment_path,
+                vk::ShaderStageFlags::FRAGMENT,
+            )
+            .unwrap();
+
+        let shader_set = ShaderSetBuilder::default()
+            .vertex_shader(shader_cache[vertex_path].clone())
+            .fragment_shader(shader_cache[fragment_path].clone())
+            .build()
+            .expect("Failed to build shader set!");
 
         let settings = RenderPipelineSettingsBuilder::default()
             .render_pass(render_pass.clone())

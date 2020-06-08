@@ -235,7 +235,7 @@ impl Brdflut {
             context.clone(),
             "assets/shaders/environment/genbrdflut.vert.spv",
             vk::ShaderStageFlags::VERTEX,
-            &shader_entry_point_name,
+            "main",
         )
         .expect("Failed to create vertex shader!");
 
@@ -243,7 +243,7 @@ impl Brdflut {
             context,
             "assets/shaders/environment/genbrdflut.frag.spv",
             vk::ShaderStageFlags::FRAGMENT,
-            &shader_entry_point_name,
+            &"main",
         )
         .expect("Failed to create fragment shader!");
 

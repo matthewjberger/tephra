@@ -1,14 +1,14 @@
 use ash::{version::DeviceV1_0, vk};
 use nalgebra_glm as glm;
-use snafu::{ResultExt, Snafu};
+use snafu::Snafu;
 use std::{boxed::Box, mem, sync::Arc};
 use support::{
     app::{run_app, setup_app, App, AppState},
     camera::FreeCamera,
     vulkan::{
-        Buffer, Command, CommandPool, DescriptorPool, DescriptorSetLayout, ObjModel,
-        RenderPipeline, RenderPipelineSettingsBuilder, Renderer, ShaderSet, VulkanContext,
-        VulkanSwapchain,
+        Buffer, Command, CommandPool, DescriptorPool, DescriptorSetLayout, ObjModel, RenderPass,
+        RenderPipeline, RenderPipelineSettingsBuilder, Renderer, ShaderCache, ShaderSetBuilder,
+        VulkanContext,
     },
 };
 use winit::window::Window;
@@ -79,7 +79,12 @@ impl App for DemoApp {
         renderer: &mut Renderer,
         app_state: &AppState,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.recreate_pipelines(renderer.context.clone(), renderer.vulkan_swapchain())?;
+        let render_pass = renderer.vulkan_swapchain().render_pass.clone();
+        self.recreate_pipelines(
+            renderer.context.clone(),
+            &mut renderer.shader_cache,
+            render_pass,
+        )?;
         renderer.record_all_command_buffers(self as &mut dyn Command);
 
         window.set_cursor_visible(false);
@@ -198,7 +203,8 @@ impl Command for DemoApp {
     fn recreate_pipelines(
         &mut self,
         context: Arc<VulkanContext>,
-        swapchain: &VulkanSwapchain,
+        shader_cache: &mut ShaderCache,
+        render_pass: Arc<RenderPass>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let descriptions = ObjModel::create_vertex_input_descriptions();
         let attributes = ObjModel::create_vertex_attributes();
@@ -207,20 +213,31 @@ impl Command for DemoApp {
             .vertex_attribute_descriptions(&attributes)
             .build();
 
-        let shader_set = Arc::new(
-            ShaderSet::new(context.clone())
-                .context(CreateShaderSet {})?
-                .vertex_shader("assets/shaders/model/model.vert.spv")
-                .context(CreateShader {})?
-                .fragment_shader("assets/shaders/model/model.frag.spv")
-                .context(CreateShader {})?,
-        );
+        let vertex_path = "assets/shaders/model/model.vert.spv";
+        let fragment_path = "assets/shaders/model/model.frag.spv";
+
+        shader_cache
+            .add_shader(context.clone(), &vertex_path, vk::ShaderStageFlags::VERTEX)
+            .unwrap();
+        shader_cache
+            .add_shader(
+                context.clone(),
+                &fragment_path,
+                vk::ShaderStageFlags::FRAGMENT,
+            )
+            .unwrap();
+
+        let shader_set = ShaderSetBuilder::default()
+            .vertex_shader(shader_cache[vertex_path].clone())
+            .fragment_shader(shader_cache[fragment_path].clone())
+            .build()
+            .expect("Failed to build shader set!");
 
         let descriptor_set_layout =
             Arc::new(ModelPipelineData::descriptor_set_layout(context.clone()));
 
         let settings = RenderPipelineSettingsBuilder::default()
-            .render_pass(swapchain.render_pass.clone())
+            .render_pass(render_pass)
             .vertex_state_info(vertex_state_info)
             .descriptor_set_layout(descriptor_set_layout)
             .shader_set(shader_set)

@@ -1,8 +1,11 @@
 use crate::vulkan::VulkanContext;
 use ash::{version::DeviceV1_0, vk};
+use derive_builder::Builder;
 use snafu::{ResultExt, Snafu};
 use std::{
-    ffi::{CStr, CString},
+    collections::HashMap,
+    ffi::CString,
+    ops::{Deref, DerefMut},
     sync::Arc,
 };
 
@@ -24,96 +27,76 @@ pub enum Error {
     CreateShaderModule { source: ash::vk::Result },
 }
 
-// TODO: Make a shader cache with Arc's to each shader, addressable via a string name
-//       Then shader sets can just be a collection of cloned Arc's
-pub struct ShaderSet {
-    pub vertex_shader: Option<Shader>,
-    pub fragment_shader: Option<Shader>,
-    pub geometry_shader: Option<Shader>,
-    pub tessellation_evaluation_shader: Option<Shader>,
-    pub tessellation_control_shader: Option<Shader>,
-    entry_point_name: CString,
-    context: Arc<VulkanContext>,
+pub type ShaderMap = HashMap<String, Arc<Shader>>;
+
+#[derive(Default)]
+pub struct ShaderCache(ShaderMap);
+
+impl Deref for ShaderCache {
+    type Target = ShaderMap;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
-impl ShaderSet {
-    pub const SHADER_ENTRY_POINT_NAME: &'static str = "main";
-
-    pub fn new(context: Arc<VulkanContext>) -> Result<Self> {
-        let entry_point_name = CString::new(ShaderSet::SHADER_ENTRY_POINT_NAME.to_string())
-            .expect("Failed to create CString for shader entry point name!");
-
-        let shader_set = Self {
-            context,
-            entry_point_name,
-            vertex_shader: None,
-            fragment_shader: None,
-            geometry_shader: None,
-            tessellation_evaluation_shader: None,
-            tessellation_control_shader: None,
-        };
-
-        Ok(shader_set)
+impl DerefMut for ShaderCache {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
+}
 
-    pub fn vertex_shader(mut self, path: &str) -> Result<Self> {
-        let vertex_shader = self.create_shader(&path, vk::ShaderStageFlags::VERTEX)?;
-        self.vertex_shader = Some(vertex_shader);
-        Ok(self)
+impl ShaderCache {
+    pub fn add_shader(
+        &mut self,
+        context: Arc<VulkanContext>,
+        path: &str,
+        stage_flags: vk::ShaderStageFlags,
+    ) -> Result<()> {
+        let shader =
+            Shader::from_file(context, &path, stage_flags, Shader::SHADER_ENTRY_POINT_NAME)?;
+
+        self.insert(path.to_string(), Arc::new(shader));
+
+        Ok(())
     }
+}
+#[derive(Builder, Clone)]
+#[builder(setter(into, strip_option))]
+pub struct ShaderSet {
+    pub vertex_shader: Arc<Shader>,
 
-    pub fn fragment_shader(mut self, path: &str) -> Result<Self> {
-        let fragment_shader = self.create_shader(&path, vk::ShaderStageFlags::FRAGMENT)?;
-        self.fragment_shader = Some(fragment_shader);
-        Ok(self)
-    }
+    #[builder(default)]
+    pub fragment_shader: Option<Arc<Shader>>,
 
-    pub fn geometry_shader(mut self, path: &str) -> Result<Self> {
-        let geometry_shader = self.create_shader(&path, vk::ShaderStageFlags::GEOMETRY)?;
-        self.geometry_shader = Some(geometry_shader);
-        Ok(self)
-    }
+    #[builder(default)]
+    pub geometry_shader: Option<Arc<Shader>>,
 
-    pub fn tessellation_control_shader(mut self, path: &str) -> Result<Self> {
-        let tessellation_control_shader =
-            self.create_shader(&path, vk::ShaderStageFlags::TESSELLATION_CONTROL)?;
-        self.tessellation_control_shader = Some(tessellation_control_shader);
-        Ok(self)
-    }
+    #[builder(default)]
+    pub tessellation_evaluation_shader: Option<Arc<Shader>>,
 
-    pub fn tessellation_evaluation_shader(mut self, path: &str) -> Result<Self> {
-        let tessellation_evaluation_shader =
-            self.create_shader(&path, vk::ShaderStageFlags::TESSELLATION_EVALUATION)?;
-        self.tessellation_evaluation_shader = Some(tessellation_evaluation_shader);
-        Ok(self)
-    }
-
-    fn create_shader(&self, path: &str, stage_flags: vk::ShaderStageFlags) -> Result<Shader> {
-        let shader = Shader::from_file(
-            self.context.clone(),
-            path,
-            stage_flags,
-            &self.entry_point_name,
-        )?;
-
-        Ok(shader)
-    }
+    #[builder(default)]
+    pub tessellation_control_shader: Option<Arc<Shader>>,
 }
 
 pub struct Shader {
     context: Arc<VulkanContext>,
     module: vk::ShaderModule,
     state_info: vk::PipelineShaderStageCreateInfo,
+    _entry_point_name: CString,
 }
 
 impl Shader {
-    // TODO: Refactor this to have less parameters
+    pub const SHADER_ENTRY_POINT_NAME: &'static str = "main";
+
     pub fn from_file(
         context: Arc<VulkanContext>,
         path: &str,
         flags: vk::ShaderStageFlags,
-        entry_point_name: &CStr,
+        entry_point_name: &str,
     ) -> Result<Self> {
+        let entry_point_name = CString::new(entry_point_name)
+            .expect("Failed to create CString for shader entry point name!");
         let mut shader_file = std::fs::File::open(path).context(FindShaderFilePath { path })?;
         let shader_source = ash::util::read_spv(&mut shader_file).context(ReadShaderSourceBytes)?;
         let shader_create_info = vk::ShaderModuleCreateInfo::builder()
@@ -130,13 +113,14 @@ impl Shader {
         let state_info = vk::PipelineShaderStageCreateInfo::builder()
             .stage(flags)
             .module(module)
-            .name(entry_point_name)
+            .name(&entry_point_name)
             .build();
 
         let shader = Shader {
             module,
             context,
             state_info,
+            _entry_point_name: entry_point_name,
         };
 
         Ok(shader)

@@ -13,7 +13,7 @@ pub struct RenderPipelineSettings {
     pub render_pass: Arc<RenderPass>,
     pub vertex_state_info: vk::PipelineVertexInputStateCreateInfo,
     pub descriptor_set_layout: Arc<DescriptorSetLayout>,
-    pub shader_set: Arc<ShaderSet>,
+    pub shader_set: ShaderSet,
 
     #[builder(default)]
     pub blended: bool,
@@ -54,12 +54,7 @@ pub struct RenderPipeline {
 impl RenderPipeline {
     pub fn new(context: Arc<VulkanContext>, settings: RenderPipelineSettings) -> Self {
         let shader_state_info = [
-            settings
-                .shader_set
-                .vertex_shader
-                .as_ref()
-                .expect("Failed to lookup vertex shader!")
-                .state_info(),
+            settings.shader_set.vertex_shader.state_info(),
             settings
                 .shader_set
                 .fragment_shader

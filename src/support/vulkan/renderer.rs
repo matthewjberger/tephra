@@ -1,6 +1,6 @@
 use crate::vulkan::{
-    core::sync::synchronization_set::SynchronizationSetConstants, CommandPool, SynchronizationSet,
-    VulkanContext, VulkanSwapchain,
+    core::sync::synchronization_set::SynchronizationSetConstants, CommandPool, RenderPass,
+    ShaderCache, SynchronizationSet, VulkanContext, VulkanSwapchain,
 };
 use ash::vk;
 use nalgebra_glm as glm;
@@ -21,7 +21,8 @@ pub trait Command {
     fn recreate_pipelines(
         &mut self,
         _: Arc<VulkanContext>,
-        _: &VulkanSwapchain,
+        _: &mut ShaderCache,
+        _: Arc<RenderPass>,
     ) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
@@ -29,6 +30,7 @@ pub trait Command {
 
 pub struct Renderer {
     pub context: Arc<VulkanContext>,
+    pub shader_cache: ShaderCache,
     pub vulkan_swapchain: Option<VulkanSwapchain>,
     pub synchronization_set: SynchronizationSet,
     pub current_frame: usize,
@@ -61,6 +63,7 @@ impl Renderer {
 
         Self {
             context,
+            shader_cache: ShaderCache::default(),
             vulkan_swapchain,
             synchronization_set,
             current_frame: 0,
@@ -168,10 +171,12 @@ impl Renderer {
             [window_dimensions.x as _, window_dimensions.y as _],
             &self.command_pool,
         );
+
+        let render_pass = new_swapchain.render_pass.clone();
         self.vulkan_swapchain = Some(new_swapchain);
 
         command
-            .recreate_pipelines(self.context.clone(), self.vulkan_swapchain())
+            .recreate_pipelines(self.context.clone(), &mut self.shader_cache, render_pass)
             .expect("Failed to recreate pipelines!");
         self.record_all_command_buffers(command);
     }

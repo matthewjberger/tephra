@@ -1,4 +1,7 @@
-use crate::vulkan::{DebugLayer, Instance, LogicalDevice, PhysicalDevice, Surface, InstanceError, PhysicalDeviceError, LogicalDeviceError};
+use crate::vulkan::{
+    DebugLayer, Instance, InstanceError, LogicalDevice, LogicalDeviceError, PhysicalDevice,
+    PhysicalDeviceError, Surface,
+};
 use ash::{
     extensions::khr::Swapchain,
     version::{DeviceV1_0, InstanceV1_0},
@@ -14,19 +17,13 @@ type Result<T, E = VulkanContextError> = std::result::Result<T, E>;
 #[snafu(visibility = "pub(crate)")]
 pub enum VulkanContextError {
     #[snafu(display("Failed to create instance for context: {}", source))]
-    InstanceCreation {
-        source: InstanceError,
-    },
+    InstanceCreation { source: InstanceError },
 
     #[snafu(display("Failed to create physical device for context: {}", source))]
-    PhysicalDeviceCreation {
-        source: PhysicalDeviceError,
-    },
+    PhysicalDeviceCreation { source: PhysicalDeviceError },
 
     #[snafu(display("Failed to create logical device for context: {}", source))]
-    LogicalDeviceCreation {
-        source: LogicalDeviceError,
-    },
+    LogicalDeviceCreation { source: LogicalDeviceError },
 }
 
 // The order the struct members here are declared in

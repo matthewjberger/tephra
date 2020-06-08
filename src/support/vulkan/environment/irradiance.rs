@@ -533,7 +533,7 @@ impl IrradianceMap {
             context.clone(),
             "assets/shaders/environment/filtercube.vert.spv",
             vk::ShaderStageFlags::VERTEX,
-            &shader_entry_point_name,
+            "main",
         )
         .expect("Failed to create vertex shader!");
 
@@ -541,7 +541,7 @@ impl IrradianceMap {
             context,
             "assets/shaders/environment/irradiancecube.frag.spv",
             vk::ShaderStageFlags::FRAGMENT,
-            &shader_entry_point_name,
+            "main",
         )
         .expect("Failed to create fragment shader!");
 
