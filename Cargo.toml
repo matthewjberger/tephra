@@ -19,6 +19,7 @@ tobj = "2.0.0"
 petgraph = "0.5.0"
 log = "0.4.8"
 simplelog = { version = "0.8.0", features = ["termcolor"] }
+derive_builder = "0.9.0"
 
 [build-dependencies]
 shader-compilation = { version = "*", path = "shader-compilation" }
@@ -31,7 +32,6 @@ winapi = { version = "0.3.8", features = ["windef", "libloaderapi"] }
 [lib]
 name = "support"
 path = "src/support/lib.rs"
-
 
 [features]
 default = []

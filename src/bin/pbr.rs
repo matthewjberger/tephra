@@ -11,8 +11,8 @@ use support::{
     vulkan::{
         Brdflut, Buffer, Command, CommandPool, DescriptorPool, DescriptorSetLayout, DummyImage,
         GeometryBuffer, GltfAsset, GraphicsPipeline, HdrCubemap, IrradianceMap, PrefilterMap,
-        Primitive, RenderPipeline, RenderPipelineSettings, Renderer, ShaderSet, TextureBundle,
-        VulkanContext, VulkanSwapchain,
+        Primitive, RenderPipeline, RenderPipelineSettingsBuilder, Renderer, ShaderSet,
+        TextureBundle, VulkanContext, VulkanSwapchain,
     },
 };
 use winit::window::Window;
@@ -428,15 +428,16 @@ impl Command for DemoApp {
         let descriptor_set_layout =
             Arc::new(PbrPipelineData::descriptor_set_layout(context.clone()));
 
-        let mut settings = RenderPipelineSettings::new(
-            swapchain.render_pass.clone(),
-            vertex_state_info,
-            descriptor_set_layout,
-            shader_set,
-        )
-        .rasterization_samples(context.max_usable_samples())
-        .sample_shading_enabled(true)
-        .push_constant_range(push_constant_range);
+        let mut settings = RenderPipelineSettingsBuilder::default()
+            .render_pass(swapchain.render_pass.clone())
+            .vertex_state_info(vertex_state_info)
+            .descriptor_set_layout(descriptor_set_layout)
+            .shader_set(shader_set)
+            .rasterization_samples(context.max_usable_samples())
+            .sample_shading_enabled(true)
+            .push_constant_range(push_constant_range)
+            .build()
+            .expect("Failed to create render pipeline settings");
 
         self.pbr_pipeline = None;
         self.pbr_pipeline_blend = None;

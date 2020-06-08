@@ -2,8 +2,9 @@ use crate::{
     byte_slice_from,
     vulkan::{
         CommandPool, Cubemap, DescriptorPool, DescriptorSetLayout, Framebuffer,
-        ImageLayoutTransition, Offscreen, RenderPass, RenderPipeline, RenderPipelineSettings,
-        ShaderSet, TextureBundle, TextureDescription, UnitCube, VulkanContext,
+        ImageLayoutTransition, Offscreen, RenderPass, RenderPipeline,
+        RenderPipelineSettingsBuilder, ShaderSet, TextureBundle, TextureDescription, UnitCube,
+        VulkanContext,
     },
 };
 use ash::{version::DeviceV1_0, vk};
@@ -116,14 +117,15 @@ impl HdrCubemap {
                 .context(CreateShader {})?,
         );
 
-        let settings = RenderPipelineSettings::new(
-            render_pass.clone(),
-            vertex_state_info,
-            descriptor_set_layout,
-            shader_set,
-        )
-        .rasterization_samples(vk::SampleCountFlags::TYPE_1)
-        .push_constant_range(push_constant_range);
+        let settings = RenderPipelineSettingsBuilder::default()
+            .render_pass(render_pass.clone())
+            .vertex_state_info(vertex_state_info)
+            .descriptor_set_layout(descriptor_set_layout)
+            .shader_set(shader_set)
+            .rasterization_samples(vk::SampleCountFlags::TYPE_1)
+            .push_constant_range(push_constant_range)
+            .build()
+            .expect("Failed to create render pipeline settings");
 
         let render_pipeline = RenderPipeline::new(context.clone(), settings);
 

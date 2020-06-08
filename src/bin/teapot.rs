@@ -7,7 +7,7 @@ use support::{
     camera::FreeCamera,
     vulkan::{
         Buffer, Command, CommandPool, DescriptorPool, DescriptorSetLayout, ObjModel,
-        RenderPipeline, RenderPipelineSettings, Renderer, ShaderSet, VulkanContext,
+        RenderPipeline, RenderPipelineSettingsBuilder, Renderer, ShaderSet, VulkanContext,
         VulkanSwapchain,
     },
 };
@@ -219,13 +219,14 @@ impl Command for DemoApp {
         let descriptor_set_layout =
             Arc::new(ModelPipelineData::descriptor_set_layout(context.clone()));
 
-        let settings = RenderPipelineSettings::new(
-            swapchain.render_pass.clone(),
-            vertex_state_info,
-            descriptor_set_layout,
-            shader_set,
-        )
-        .rasterization_samples(context.max_usable_samples());
+        let settings = RenderPipelineSettingsBuilder::default()
+            .render_pass(swapchain.render_pass.clone())
+            .vertex_state_info(vertex_state_info)
+            .descriptor_set_layout(descriptor_set_layout)
+            .shader_set(shader_set)
+            .rasterization_samples(context.max_usable_samples())
+            .build()
+            .expect("Failed to create render pipeline settings");
 
         self.pipeline = None;
         self.pipeline = Some(RenderPipeline::new(context, settings));

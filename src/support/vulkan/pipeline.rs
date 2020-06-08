@@ -2,102 +2,48 @@ use crate::vulkan::{
     DescriptorSetLayout, GraphicsPipeline, PipelineLayout, RenderPass, ShaderSet, VulkanContext,
 };
 use ash::{version::DeviceV1_0, vk};
+use derive_builder::Builder;
 use std::sync::Arc;
 
 // TODO: Add a builder for this struct
 // TODO: Move shader paths into separate struct to be constructed with the builder pattern
-#[derive(Clone)]
+#[derive(Builder, Clone)]
+#[builder(setter(into))]
 pub struct RenderPipelineSettings {
     pub render_pass: Arc<RenderPass>,
     pub vertex_state_info: vk::PipelineVertexInputStateCreateInfo,
     pub descriptor_set_layout: Arc<DescriptorSetLayout>,
-    pub blended: bool,
-    pub depth_test_enabled: bool,
-    pub depth_write_enabled: bool,
-    pub stencil_test_enabled: bool,
-    pub stencil_front_state: vk::StencilOpState,
-    pub stencil_back_state: vk::StencilOpState,
-    pub push_constant_range: Option<vk::PushConstantRange>,
     pub shader_set: Arc<ShaderSet>,
+
+    #[builder(default)]
+    pub blended: bool,
+
+    #[builder(default = "true")]
+    pub depth_test_enabled: bool,
+
+    #[builder(default = "true")]
+    pub depth_write_enabled: bool,
+
+    #[builder(default)]
+    pub stencil_test_enabled: bool,
+
+    #[builder(default)]
+    pub stencil_front_state: vk::StencilOpState,
+
+    #[builder(default)]
+    pub stencil_back_state: vk::StencilOpState,
+
+    #[builder(default)]
+    pub push_constant_range: Option<vk::PushConstantRange>,
+
+    #[builder(default)]
     pub rasterization_samples: vk::SampleCountFlags,
+
+    #[builder(default)]
     pub sample_shading_enabled: bool,
+
+    #[builder(default = "vk::CullModeFlags::NONE")]
     pub cull_mode: vk::CullModeFlags,
-}
-
-impl RenderPipelineSettings {
-    pub fn new(
-        render_pass: Arc<RenderPass>,
-        vertex_state_info: vk::PipelineVertexInputStateCreateInfo,
-        descriptor_set_layout: Arc<DescriptorSetLayout>,
-        shader_set: Arc<ShaderSet>,
-    ) -> Self {
-        Self {
-            render_pass,
-            vertex_state_info,
-            descriptor_set_layout,
-            shader_set,
-            blended: false,
-            depth_test_enabled: true,
-            depth_write_enabled: true,
-            stencil_test_enabled: false,
-            stencil_front_state: vk::StencilOpState::default(),
-            stencil_back_state: vk::StencilOpState::default(),
-            push_constant_range: None,
-            rasterization_samples: vk::SampleCountFlags::TYPE_1,
-            sample_shading_enabled: false,
-            cull_mode: vk::CullModeFlags::NONE,
-        }
-    }
-
-    pub fn blended(mut self, blended: bool) -> Self {
-        self.blended = blended;
-        self
-    }
-
-    pub fn depth_test_enabled(mut self, depth_test_enabled: bool) -> Self {
-        self.depth_test_enabled = depth_test_enabled;
-        self
-    }
-
-    pub fn depth_write_enabled(mut self, depth_write_enabled: bool) -> Self {
-        self.depth_write_enabled = depth_write_enabled;
-        self
-    }
-
-    pub fn stencil_test_enabled(mut self, stencil_test_enabled: bool) -> Self {
-        self.stencil_test_enabled = stencil_test_enabled;
-        self
-    }
-
-    pub fn stencil_front_state(mut self, stencil_front_state: vk::StencilOpState) -> Self {
-        self.stencil_front_state = stencil_front_state;
-        self
-    }
-
-    pub fn stencil_back_state(mut self, stencil_back_state: vk::StencilOpState) -> Self {
-        self.stencil_back_state = stencil_back_state;
-        self
-    }
-
-    pub fn push_constant_range(mut self, push_constant_range: vk::PushConstantRange) -> Self {
-        self.push_constant_range = Some(push_constant_range);
-        self
-    }
-
-    pub fn rasterization_samples(mut self, rasterization_samples: vk::SampleCountFlags) -> Self {
-        self.rasterization_samples = rasterization_samples;
-        self
-    }
-
-    pub fn sample_shading_enabled(mut self, sample_shading_enabled: bool) -> Self {
-        self.sample_shading_enabled = sample_shading_enabled;
-        self
-    }
-
-    pub fn cull_mode(mut self, cull_mode: vk::CullModeFlags) -> Self {
-        self.cull_mode = cull_mode;
-        self
-    }
 }
 
 pub struct RenderPipeline {
