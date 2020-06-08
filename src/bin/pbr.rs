@@ -135,14 +135,6 @@ impl App for DemoApp {
             &hdr.as_ref().expect("Failed to lookup hdr cubemap!").cubemap,
         );
 
-        let skybox_pipeline_data = SkyboxPipelineData::new(
-            self.context.clone(),
-            &renderer.transient_command_pool,
-            &hdr.as_ref().expect("Failed to lookup hdr cubemap!").cubemap,
-        );
-
-        self.skybox_pipeline_data = Some(skybox_pipeline_data);
-
         let environment_maps = EnvironmentMapSet {
             brdflut,
             irradiance,
@@ -205,6 +197,14 @@ impl App for DemoApp {
         );
 
         self.pbr_pipeline_data = Some(pbr_pipeline_data);
+
+        let skybox_pipeline_data = SkyboxPipelineData::new(
+            self.context.clone(),
+            &renderer.transient_command_pool,
+            &environment_maps.prefilter.cubemap,
+        );
+
+        self.skybox_pipeline_data = Some(skybox_pipeline_data);
 
         self.environment_maps = Some(environment_maps);
 
