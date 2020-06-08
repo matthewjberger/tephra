@@ -13,7 +13,7 @@ use support::{
         DescriptorSetLayout, DummyImage, GeometryBuffer, GltfAsset, GraphicsPipeline, HdrCubemap,
         IrradianceMap, PrefilterMap, Primitive, RenderPass, RenderPipeline,
         RenderPipelineSettingsBuilder, Renderer, ShaderCache, ShaderSetBuilder, SkyboxPipelineData,
-        SkyboxRenderer, TextureBundle, VulkanContext,
+        SkyboxRenderer, SkyboxUniformBufferObject, TextureBundle, VulkanContext,
     },
 };
 use winit::window::Window;
@@ -238,6 +238,17 @@ impl App for DemoApp {
             0.1_f32,
             1000_f32,
         );
+
+        let view = self.camera.view_matrix();
+
+        if let Some(skybox_data) = &self.skybox_pipeline_data.as_ref() {
+            let skybox_ubo = SkyboxUniformBufferObject { view, projection };
+            let skybox_ubos = [skybox_ubo];
+
+            skybox_data
+                .uniform_buffer
+                .upload_to_buffer(&skybox_ubos, 0)?;
+        }
 
         for asset in self.assets.iter_mut() {
             for animation in asset.animations.iter_mut() {

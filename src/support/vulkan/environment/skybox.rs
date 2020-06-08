@@ -57,7 +57,7 @@ pub fn create_skybox_pipeline(
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct UniformBufferObject {
+pub struct SkyboxUniformBufferObject {
     pub view: glm::Mat4,
     pub projection: glm::Mat4,
 }
@@ -79,7 +79,7 @@ impl SkyboxPipelineData {
 
         let uniform_buffer = Buffer::new_mapped_basic(
             context.clone(),
-            mem::size_of::<UniformBufferObject>() as _,
+            mem::size_of::<SkyboxUniformBufferObject>() as _,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
             vk_mem::MemoryUsage::CpuToGpu,
         )
@@ -141,7 +141,7 @@ impl SkyboxPipelineData {
     }
 
     fn update_descriptor_set(&self, context: Arc<VulkanContext>, cubemap: &Cubemap) {
-        let uniform_buffer_size = mem::size_of::<UniformBufferObject>() as vk::DeviceSize;
+        let uniform_buffer_size = mem::size_of::<SkyboxUniformBufferObject>() as vk::DeviceSize;
         let buffer_info = vk::DescriptorBufferInfo::builder()
             .buffer(self.uniform_buffer.buffer())
             .offset(0)
