@@ -1,6 +1,6 @@
 use crate::vulkan::{
     Buffer, CommandPool, Cubemap, DescriptorPool, DescriptorSetLayout, RenderPass, RenderPipeline,
-    RenderPipelineSettingsBuilder, ShaderCache, ShaderSetBuilder, UnitCube, VulkanContext,
+    RenderPipelineSettingsBuilder, ShaderCache, ShaderPathSetBuilder, UnitCube, VulkanContext,
 };
 use ash::{version::DeviceV1_0, vk};
 use nalgebra_glm as glm;
@@ -18,26 +18,14 @@ pub fn create_skybox_pipeline(
         .vertex_attribute_descriptions(&attributes)
         .build();
 
-    let vertex_path = "assets/shaders/environment/skybox.vert.spv";
-    let fragment_path = "assets/shaders/environment/skybox.frag.spv";
-
-    shader_cache
-        .add_shader(context.clone(), &vertex_path, vk::ShaderStageFlags::VERTEX)
-        .unwrap();
-
-    shader_cache
-        .add_shader(
-            context.clone(),
-            &fragment_path,
-            vk::ShaderStageFlags::FRAGMENT,
-        )
-        .unwrap();
-
-    let shader_set = ShaderSetBuilder::default()
-        .vertex_shader(shader_cache[vertex_path].clone())
-        .fragment_shader(shader_cache[fragment_path].clone())
+    let shader_paths = ShaderPathSetBuilder::default()
+        .vertex("assets/shaders/environment/skybox.vert.spv")
+        .fragment("assets/shaders/environment/skybox.frag.spv")
         .build()
-        .expect("Failed to build shader set!");
+        .unwrap();
+    let shader_set = shader_cache
+        .create_shader_set(context.clone(), &shader_paths)
+        .unwrap();
 
     let descriptor_set_layout = SkyboxPipelineData::descriptor_set_layout(context.clone());
     let settings = RenderPipelineSettingsBuilder::default()

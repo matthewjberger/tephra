@@ -7,7 +7,7 @@ use support::{
     camera::FreeCamera,
     vulkan::{
         Buffer, Command, CommandPool, DescriptorPool, DescriptorSetLayout, ObjModel, RenderPass,
-        RenderPipeline, RenderPipelineSettingsBuilder, Renderer, ShaderCache, ShaderSetBuilder,
+        RenderPipeline, RenderPipelineSettingsBuilder, Renderer, ShaderCache, ShaderPathSetBuilder,
         VulkanContext,
     },
 };
@@ -213,25 +213,11 @@ impl Command for DemoApp {
             .vertex_attribute_descriptions(&attributes)
             .build();
 
-        let vertex_path = "assets/shaders/model/model.vert.spv";
-        let fragment_path = "assets/shaders/model/model.frag.spv";
-
-        shader_cache
-            .add_shader(context.clone(), &vertex_path, vk::ShaderStageFlags::VERTEX)
-            .unwrap();
-        shader_cache
-            .add_shader(
-                context.clone(),
-                &fragment_path,
-                vk::ShaderStageFlags::FRAGMENT,
-            )
-            .unwrap();
-
-        let shader_set = ShaderSetBuilder::default()
-            .vertex_shader(shader_cache[vertex_path].clone())
-            .fragment_shader(shader_cache[fragment_path].clone())
-            .build()
-            .expect("Failed to build shader set!");
+        let shader_paths = ShaderPathSetBuilder::default()
+            .vertex("assets/shaders/model/model.vert.spv")
+            .fragment("assets/shaders/model/model.frag.spv")
+            .build()?;
+        let shader_set = shader_cache.create_shader_set(context.clone(), &shader_paths)?;
 
         let descriptor_set_layout =
             Arc::new(ModelPipelineData::descriptor_set_layout(context.clone()));

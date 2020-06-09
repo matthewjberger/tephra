@@ -3,7 +3,7 @@ use crate::{
     vulkan::{
         CommandPool, Cubemap, DescriptorPool, DescriptorSetLayout, Framebuffer,
         ImageLayoutTransition, Offscreen, RenderPass, RenderPipeline,
-        RenderPipelineSettingsBuilder, ShaderCache, ShaderSetBuilder, TextureBundle,
+        RenderPipelineSettingsBuilder, ShaderCache, ShaderPathSetBuilder, TextureBundle,
         TextureDescription, UnitCube, VulkanContext,
     },
 };
@@ -105,25 +105,14 @@ impl HdrCubemap {
             .size(std::mem::size_of::<PushBlockHdr>() as u32)
             .build();
 
-        let vertex_path = "assets/shaders/environment/filtercube.vert.spv";
-        let fragment_path = "assets/shaders/environment/equirectangular_to_cubemap.frag.spv";
-
-        shader_cache
-            .add_shader(context.clone(), &vertex_path, vk::ShaderStageFlags::VERTEX)
-            .unwrap();
-        shader_cache
-            .add_shader(
-                context.clone(),
-                &fragment_path,
-                vk::ShaderStageFlags::FRAGMENT,
-            )
-            .unwrap();
-
-        let shader_set = ShaderSetBuilder::default()
-            .vertex_shader(shader_cache[vertex_path].clone())
-            .fragment_shader(shader_cache[fragment_path].clone())
+        let shader_paths = ShaderPathSetBuilder::default()
+            .vertex("assets/shaders/environment/filtercube.vert.spv")
+            .fragment("assets/shaders/environment/equirectangular_to_cubemap.frag.spv")
             .build()
-            .expect("Failed to build shader set!");
+            .unwrap();
+        let shader_set = shader_cache
+            .create_shader_set(context.clone(), &shader_paths)
+            .unwrap();
 
         let settings = RenderPipelineSettingsBuilder::default()
             .render_pass(render_pass.clone())

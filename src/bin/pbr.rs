@@ -12,8 +12,9 @@ use support::{
         create_skybox_pipeline, Brdflut, Buffer, Command, CommandPool, DescriptorPool,
         DescriptorSetLayout, DummyImage, GeometryBuffer, GltfAsset, GraphicsPipeline, HdrCubemap,
         IrradianceMap, PrefilterMap, Primitive, RenderPass, RenderPipeline,
-        RenderPipelineSettingsBuilder, Renderer, ShaderCache, ShaderSetBuilder, SkyboxPipelineData,
-        SkyboxRenderer, SkyboxUniformBufferObject, TextureBundle, VulkanContext,
+        RenderPipelineSettingsBuilder, Renderer, ShaderCache, ShaderPathSetBuilder,
+        SkyboxPipelineData, SkyboxRenderer, SkyboxUniformBufferObject, TextureBundle,
+        VulkanContext,
     },
 };
 use winit::window::Window;
@@ -472,25 +473,11 @@ impl Command for DemoApp {
             .size(mem::size_of::<PushConstantBlockMaterial>() as u32)
             .build();
 
-        let vertex_path = "assets/shaders/pbr/pbr.vert.spv";
-        let fragment_path = "assets/shaders/pbr/pbr.frag.spv";
-
-        shader_cache
-            .add_shader(context.clone(), &vertex_path, vk::ShaderStageFlags::VERTEX)
-            .unwrap();
-        shader_cache
-            .add_shader(
-                context.clone(),
-                &fragment_path,
-                vk::ShaderStageFlags::FRAGMENT,
-            )
-            .unwrap();
-
-        let shader_set = ShaderSetBuilder::default()
-            .vertex_shader(shader_cache[vertex_path].clone())
-            .fragment_shader(shader_cache[fragment_path].clone())
-            .build()
-            .expect("Failed to build shader set!");
+        let shader_paths = ShaderPathSetBuilder::default()
+            .vertex("assets/shaders/pbr/pbr.vert.spv")
+            .fragment("assets/shaders/pbr/pbr.frag.spv")
+            .build()?;
+        let shader_set = shader_cache.create_shader_set(context.clone(), &shader_paths)?;
 
         let descriptor_set_layout =
             Arc::new(PbrPipelineData::descriptor_set_layout(context.clone()));
