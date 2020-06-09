@@ -51,6 +51,7 @@ fn main() {
 
 pub struct EnvironmentMapSet {
     brdflut: Brdflut,
+    hdr: HdrCubemap,
     irradiance: IrradianceMap,
     prefilter: PrefilterMap,
 }
@@ -137,6 +138,7 @@ impl App for DemoApp {
 
         let environment_maps = EnvironmentMapSet {
             brdflut,
+            hdr: hdr.unwrap(),
             irradiance,
             prefilter,
         };
@@ -201,7 +203,7 @@ impl App for DemoApp {
         let skybox_pipeline_data = SkyboxPipelineData::new(
             self.context.clone(),
             &renderer.transient_command_pool,
-            &environment_maps.prefilter.cubemap,
+            &environment_maps.hdr.cubemap,
         );
 
         self.skybox_pipeline_data = Some(skybox_pipeline_data);
