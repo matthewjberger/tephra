@@ -26,6 +26,7 @@ struct DemoApp {
     context: Arc<VulkanContext>,
     skybox_pipeline: Option<RenderPipeline>,
     skybox_pipeline_data: Option<SkyboxPipelineData>,
+    cubemap: Option<HdrCubemap>,
     camera: FreeCamera,
 }
 
@@ -35,6 +36,7 @@ impl DemoApp {
             context,
             skybox_pipeline: None,
             skybox_pipeline_data: None,
+            cubemap: None,
             camera: FreeCamera::default(),
         }
     }
@@ -80,6 +82,8 @@ impl App for DemoApp {
         );
 
         self.skybox_pipeline_data = Some(skybox_pipeline_data);
+
+        self.cubemap = Some(hdr);
 
         let render_pass = renderer.vulkan_swapchain().render_pass.clone();
         self.recreate_pipelines(
