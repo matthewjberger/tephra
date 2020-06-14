@@ -11,7 +11,7 @@ use winit::{
         WindowEvent,
     },
     event_loop::{ControlFlow, EventLoop},
-    window::{Window, WindowBuilder},
+    window::{Fullscreen, Window, WindowBuilder},
 };
 
 use log::info;
@@ -92,6 +92,12 @@ pub fn setup_app(title: &str) -> (Window, EventLoop<()>, Renderer) {
     let window = WindowBuilder::new()
         .with_title(title)
         .with_inner_size(PhysicalSize::new(width, height))
+        .with_fullscreen(Some(Fullscreen::Borderless(
+            event_loop
+                .available_monitors()
+                .nth(0)
+                .expect("Failed to find a monitor!"),
+        )))
         .build(&event_loop)
         .expect("Failed to create window.");
 
