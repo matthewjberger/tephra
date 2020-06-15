@@ -10,7 +10,11 @@ use winit::window::Window;
 // TODO: Device parameter can be removed because it will be accessible through the vulkan context
 // TODO: Rename this to something better
 pub trait Command {
-    fn issue_commands(
+    fn issue_commands(&mut self, _: vk::CommandBuffer) -> Result<(), Box<dyn Error>> {
+        Ok(())
+    }
+
+    fn issue_renderpass_commands(
         &mut self,
         _: &ash::Device,
         _: vk::CommandBuffer,
@@ -187,6 +191,8 @@ impl Renderer {
         command_buffer: vk::CommandBuffer,
         command: &mut dyn Command,
     ) {
+        let device = self.context.logical_device().logical_device();
+
         let clear_values = [
             vk::ClearValue {
                 color: vk::ClearColorValue {
@@ -201,18 +207,23 @@ impl Renderer {
             },
         ];
 
-        let device = self.context.logical_device().logical_device();
-
         self.context.logical_device().record_command_buffer(
             command_buffer,
             vk::CommandBufferUsageFlags::SIMULTANEOUS_USE,
             || {
+                // Issue any commands before the main render pass
+                command
+                    .issue_commands(command_buffer)
+                    .expect("Failed to issue vulkan commands!");
+
+                // Issue commands for the main render pass
+                let extent = self.vulkan_swapchain().swapchain.properties().extent;
                 let render_pass_begin_info = vk::RenderPassBeginInfo::builder()
                     .render_pass(self.vulkan_swapchain().render_pass.render_pass())
                     .framebuffer(framebuffer)
                     .render_area(vk::Rect2D {
                         offset: vk::Offset2D { x: 0, y: 0 },
-                        extent: self.vulkan_swapchain().swapchain.properties().extent,
+                        extent,
                     })
                     .clear_values(&clear_values)
                     .build();
@@ -227,7 +238,7 @@ impl Renderer {
                             .update_viewport(command_buffer, extent);
 
                         command
-                            .issue_commands(device, command_buffer)
+                            .issue_renderpass_commands(device, command_buffer)
                             .expect("Failed to issue vulkan commands!");
                     },
                 );

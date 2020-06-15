@@ -95,7 +95,7 @@ pub fn setup_app(title: &str) -> (Window, EventLoop<()>, Renderer) {
         .with_fullscreen(Some(Fullscreen::Borderless(
             event_loop
                 .available_monitors()
-                .nth(0)
+                .next()
                 .expect("Failed to find a monitor!"),
         )))
         .build(&event_loop)

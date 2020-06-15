@@ -25,6 +25,12 @@ pub struct RenderPipelineSettings {
     pub depth_write_enabled: bool,
 
     #[builder(default)]
+    pub depth_bias_enabled: bool,
+
+    #[builder(default = "vk::CompareOp::LESS_OR_EQUAL")]
+    pub depth_compare_op: vk::CompareOp,
+
+    #[builder(default)]
     pub stencil_test_enabled: bool,
 
     #[builder(default)]
@@ -53,15 +59,12 @@ pub struct RenderPipeline {
 
 impl RenderPipeline {
     pub fn new(context: Arc<VulkanContext>, settings: RenderPipelineSettings) -> Self {
-        let shader_state_info = [
-            settings.shader_set.vertex_shader.state_info(),
-            settings
-                .shader_set
-                .fragment_shader
-                .as_ref()
-                .expect("Failed to lookup fragment shader!")
-                .state_info(),
-        ];
+        let mut shader_states = Vec::new();
+        shader_states.push(settings.shader_set.vertex_shader.state_info());
+
+        if let Some(fragment_shader_state) = settings.shader_set.fragment_shader.as_ref() {
+            shader_states.push(fragment_shader_state.state_info());
+        }
 
         let input_assembly_create_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
             .topology(vk::PrimitiveTopology::TRIANGLE_LIST)
@@ -75,7 +78,7 @@ impl RenderPipeline {
             .line_width(1.0)
             .cull_mode(settings.cull_mode)
             .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-            .depth_bias_enable(false)
+            .depth_bias_enable(settings.depth_bias_enabled)
             .depth_bias_constant_factor(0.0)
             .depth_bias_clamp(0.0)
             .depth_bias_slope_factor(0.0)
@@ -92,7 +95,7 @@ impl RenderPipeline {
         let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()
             .depth_test_enable(settings.depth_test_enabled)
             .depth_write_enable(settings.depth_write_enabled)
-            .depth_compare_op(vk::CompareOp::LESS_OR_EQUAL)
+            .depth_compare_op(settings.depth_compare_op)
             .depth_bounds_test_enable(false)
             .min_depth_bounds(0.0)
             .max_depth_bounds(1.0)
@@ -127,7 +130,7 @@ impl RenderPipeline {
             .build();
 
         let pipeline_create_info = vk::GraphicsPipelineCreateInfo::builder()
-            .stages(&shader_state_info)
+            .stages(&shader_states)
             .vertex_input_state(&settings.vertex_state_info)
             .input_assembly_state(&input_assembly_create_info)
             .rasterization_state(&rasterizer_create_info)

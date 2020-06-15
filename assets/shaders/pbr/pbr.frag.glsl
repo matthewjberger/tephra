@@ -8,11 +8,15 @@ layout (location = 0) in vec3 inWorldPos;
 layout (location = 1) in vec3 inNormal;
 layout (location = 2) in vec2 inUV0;
 layout (location = 3) in vec2 inUV1;
+layout (location = 4) in vec3 inLightVec;
+layout (location = 5) in vec4 inShadowCoord;
+
 
 layout(binding = 2) uniform sampler2D textures[100];
 layout(binding = 3) uniform samplerCube irradiance_cubemap;
 layout(binding = 4) uniform samplerCube prefilter_cubemap;
 layout(binding = 5) uniform sampler2D brdflut;
+layout(binding = 6) uniform sampler2D shadowmap;
 
 layout(push_constant) uniform Material {
   vec4 baseColorFactor;
@@ -31,12 +35,14 @@ layout(push_constant) uniform Material {
 layout(location = 0) out vec4 outColor;
 
 #define MAX_NUM_JOINTS 128
+#define AMBIENT 0.1
 
 layout(binding = 0) uniform UboView {
   mat4 view;
   mat4 projection;
   vec4 cameraPosition;
   mat4 jointMatrices[MAX_NUM_JOINTS];
+  vec4 lightPosition;
 } uboView;
 
 const float M_PI = 3.141592653589793;
@@ -46,6 +52,43 @@ const float OcclusionStrength = 1.0f;
 const float EmissiveFactor = 1.0f;
 const float Gamma = 2.2f;
 const float Exposure = 4.5f;
+
+float textureProj(vec4 shadowCoord, vec2 off)
+{
+	float shadow = 1.0;
+	if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 )
+  {
+    float dist = texture( shadowmap, shadowCoord.st + off ).r;
+    if ( shadowCoord.w > 0.0 && dist < shadowCoord.z )
+    {
+      shadow = AMBIENT;
+    }
+  }
+	return shadow;
+}
+
+float filterPCF(vec4 sc)
+{
+	ivec2 texDim = textureSize(shadowmap, 0);
+	float scale = 1.5;
+	float dx = scale * 1.0 / float(texDim.x);
+	float dy = scale * 1.0 / float(texDim.y);
+
+	float shadowFactor = 0.0;
+	int count = 0;
+	int range = 1;
+
+	for (int x = -range; x <= range; x++)
+  {
+    for (int y = -range; y <= range; y++)
+      {
+        shadowFactor += textureProj(sc, vec2(dx*x, dy*y));
+        count++;
+      }
+  }
+	return shadowFactor / count;
+}
+
 
 vec3 Uncharted2Tonemap(vec3 color)
 {
@@ -98,10 +141,9 @@ vec4 SRGBtoLINEAR(vec4 srgbIn)
 
 void main()
 {
-  vec3 rotation = vec3(radians(75.0f), radians(40.0f), radians(0.0f));
-  vec3 lightDir = vec3(sin(rotation.x) * cos(rotation.y),
-                       sin(rotation.y),
-                       cos(rotation.x) * cos(rotation.y));
+	float shadow = filterPCF(inShadowCoord / inShadowCoord.w);
+
+  vec3 lightDir = uboView.lightPosition.xyz;
 
 	float perceptualRoughness;
 	float metallic;
@@ -209,5 +251,5 @@ void main()
 		color += emissive;
 	}
 
-  outColor = vec4(color, baseColor.a);
+  outColor = vec4(color * shadow, baseColor.a);
 }

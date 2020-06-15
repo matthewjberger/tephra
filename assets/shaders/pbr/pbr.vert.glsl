@@ -16,6 +16,8 @@ layout(binding = 0) uniform UboView {
   mat4 projection;
   vec4 cameraPosition;
   mat4 jointMatrices[MAX_NUM_JOINTS];
+  mat4 lightSpace;
+  vec4 lightPos;
 } uboView;
 
 layout(binding = 1) uniform UboInstance {
@@ -28,6 +30,14 @@ layout (location = 0) out vec3 outWorldPos;
 layout (location = 1) out vec3 outNormal;
 layout (location = 2) out vec2 outUV0;
 layout (location = 3) out vec2 outUV1;
+layout (location = 4) out vec3 outLightVec;
+layout (location = 5) out vec4 outShadowCoord;
+
+const mat4 biasMat = mat4(
+                          0.5, 0.0, 0.0, 0.0,
+                          0.0, 0.5, 0.0, 0.0,
+                          0.0, 0.0, 1.0, 0.0,
+                          0.5, 0.5, 0.0, 1.0 );
 
 void main()
 {
@@ -46,4 +56,8 @@ void main()
   outUV0 = inUV0;
   outUV1 = inUV1;
   gl_Position =  uboView.projection * uboView.view * vec4(outWorldPos, 1.0);
+
+  outLightVec = normalize(uboView.lightPos.xyz - inPos);
+
+	outShadowCoord = (biasMat * uboView.lightSpace * uboInstance.model * skinMatrix) * vec4(inPos, 1.0);
 }

@@ -166,7 +166,7 @@ impl App for DemoApp {
 }
 
 impl Command for DemoApp {
-    fn issue_commands(
+    fn issue_renderpass_commands(
         &mut self,
         device: &ash::Device,
         command_buffer: vk::CommandBuffer,
