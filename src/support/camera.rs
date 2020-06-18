@@ -1,4 +1,4 @@
-use crate::app::AppState;
+use crate::input::Input;
 use nalgebra_glm as glm;
 use winit::event::VirtualKeyCode;
 
@@ -106,32 +106,32 @@ impl FreeCamera {
         self.up = self.right.cross(&self.front).normalize();
     }
 
-    pub fn update(&mut self, app_state: &AppState) {
-        if app_state.input.is_key_pressed(VirtualKeyCode::W) {
-            self.translate(CameraDirection::Forward, app_state.delta_time as f32);
+    pub fn update(&mut self, input: &Input, delta_time: f64) {
+        if input.is_key_pressed(VirtualKeyCode::W) {
+            self.translate(CameraDirection::Forward, delta_time as f32);
         }
 
-        if app_state.input.is_key_pressed(VirtualKeyCode::A) {
-            self.translate(CameraDirection::Left, app_state.delta_time as f32);
+        if input.is_key_pressed(VirtualKeyCode::A) {
+            self.translate(CameraDirection::Left, delta_time as f32);
         }
 
-        if app_state.input.is_key_pressed(VirtualKeyCode::S) {
-            self.translate(CameraDirection::Backward, app_state.delta_time as f32);
+        if input.is_key_pressed(VirtualKeyCode::S) {
+            self.translate(CameraDirection::Backward, delta_time as f32);
         }
 
-        if app_state.input.is_key_pressed(VirtualKeyCode::D) {
-            self.translate(CameraDirection::Right, app_state.delta_time as f32);
+        if input.is_key_pressed(VirtualKeyCode::D) {
+            self.translate(CameraDirection::Right, delta_time as f32);
         }
 
-        if app_state.input.is_key_pressed(VirtualKeyCode::LShift) {
-            self.translate(CameraDirection::Down, app_state.delta_time as f32);
+        if input.is_key_pressed(VirtualKeyCode::LShift) {
+            self.translate(CameraDirection::Down, delta_time as f32);
         }
 
-        if app_state.input.is_key_pressed(VirtualKeyCode::Space) {
-            self.translate(CameraDirection::Up, app_state.delta_time as f32);
+        if input.is_key_pressed(VirtualKeyCode::Space) {
+            self.translate(CameraDirection::Up, delta_time as f32);
         }
 
-        let offset = app_state.input.mouse.offset_from_center;
+        let offset = input.mouse.offset_from_center;
         self.process_mouse_movement(offset.x, offset.y);
     }
 }

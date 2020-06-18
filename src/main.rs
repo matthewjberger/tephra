@@ -1,13 +1,14 @@
 use ash::{version::DeviceV1_0, vk};
 use gltf::material::AlphaMode;
 use log::debug;
+use log::info;
 use nalgebra_glm as glm;
-use snafu::Snafu;
-use std::{boxed::Box, mem, sync::Arc};
+use simplelog::*;
+use std::{boxed::Box, fs::File, mem, sync::Arc, time::Instant};
 use support::{
-    app::{run_app, setup_app, App, AppState},
     byte_slice_from,
     camera::FreeCamera,
+    input::Input,
     vulkan::{
         create_skybox_pipeline, Brdflut, Buffer, Command, CommandPool, DescriptorPool,
         DescriptorSetLayout, DummyImage, GeometryBuffer, GltfAsset, GraphicsPipeline, HdrCubemap,
@@ -17,37 +18,169 @@ use support::{
         VulkanContext,
     },
 };
-use winit::window::Window;
-
-type Result<T, E = Error> = std::result::Result<T, E>;
-
-#[derive(Debug, Snafu)]
-#[snafu(visibility = "pub(crate)")]
-pub enum Error {
-    #[snafu(display("Failed to create render pipeline: {}", source))]
-    CreateRenderPipeline {
-        source: support::vulkan::shader::Error,
+use winit::{
+    dpi::{PhysicalPosition, PhysicalSize},
+    event::{
+        ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta, VirtualKeyCode,
+        WindowEvent,
     },
+    event_loop::{ControlFlow, EventLoop},
+    window::{Fullscreen, Window, WindowBuilder},
+};
 
-    #[snafu(display("Failed to create shader: {}", source))]
-    CreateShader {
-        source: support::vulkan::shader::Error,
-    },
+#[derive(Default)]
+pub struct Dimensions {
+    pub width: u32,
+    pub height: u32,
+}
 
-    #[snafu(display("Failed to create shader set: {}", source))]
-    CreateShaderSet {
-        source: support::vulkan::shader::Error,
-    },
+impl Dimensions {
+    pub fn new(width: u32, height: u32) -> Self {
+        Self { width, height }
+    }
+
+    pub fn as_vec2(&self) -> glm::Vec2 {
+        glm::vec2(self.width as _, self.height as _)
+    }
+}
+
+#[derive(Default)]
+pub struct AppState {
+    pub window_dimensions: Dimensions,
+    pub input: Input,
+    pub delta_time: f64,
+}
+
+impl AppState {
+    pub fn window_center(&self) -> PhysicalPosition<i32> {
+        PhysicalPosition::new(
+            (self.window_dimensions.width as f32 / 2.0) as i32,
+            (self.window_dimensions.height as f32 / 2.0) as i32,
+        )
+    }
 }
 
 fn main() {
-    let (window, event_loop, renderer) = setup_app("Physically Based Rendering - Gltf models");
-    run_app(
-        DemoApp::new(renderer.context.clone()),
-        window,
-        event_loop,
-        renderer,
-    );
+    CombinedLogger::init(vec![
+        TermLogger::new(LevelFilter::max(), Config::default(), TerminalMode::Mixed),
+        WriteLogger::new(
+            LevelFilter::Info,
+            Config::default(),
+            File::create("tephra.log").unwrap(),
+        ),
+    ])
+    .expect("Failed to create logger backend!");
+
+    info!("Setting up app.");
+
+    let (width, height) = (1920, 1080);
+
+    let event_loop = EventLoop::new();
+    let mut window = WindowBuilder::new()
+        .with_title("Physically Based Rendering - GLTF Models")
+        .with_inner_size(PhysicalSize::new(width, height))
+        .with_fullscreen(Some(Fullscreen::Borderless(
+            event_loop
+                .available_monitors()
+                .nth(0)
+                .expect("Failed to find a monitor!"),
+        )))
+        .build(&event_loop)
+        .expect("Failed to create window.");
+
+    let vulkan_context =
+        Arc::new(VulkanContext::new(&window).expect("Failed to create a vulkan context!"));
+
+    let mut renderer = Renderer::new(vulkan_context, &window);
+
+    let mut app = DemoApp::new(renderer.context.clone());
+
+    let mut app_state = AppState::default();
+    let window_size = window.inner_size();
+    app_state.window_dimensions = Dimensions::new(window_size.width, window_size.height);
+
+    renderer.allocate_command_buffers();
+
+    app.initialize(&mut window, &mut renderer, &app_state)
+        .expect("Failed to initialize app!");
+
+    let mut last_frame = Instant::now();
+    let mut cursor_moved = false;
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = ControlFlow::Poll;
+        match event {
+            Event::NewEvents { .. } => {
+                app_state.delta_time =
+                    (Instant::now().duration_since(last_frame).as_micros() as f64) / 1_000_000_f64;
+                last_frame = Instant::now();
+                app.update(&mut window, &mut renderer, &app_state)
+                    .expect("Failed to update app!");
+            }
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                WindowEvent::KeyboardInput {
+                    input:
+                        KeyboardInput {
+                            virtual_keycode: Some(keycode),
+                            state,
+                            ..
+                        },
+                    ..
+                } => {
+                    if keycode == VirtualKeyCode::Escape {
+                        *control_flow = ControlFlow::Exit;
+                    }
+                    *app_state.input.keystates.entry(keycode).or_insert(state) = state;
+                }
+                WindowEvent::Resized(PhysicalSize { width, height }) => {
+                    app_state.window_dimensions = Dimensions::new(width, height);
+                }
+                WindowEvent::MouseInput { button, state, .. } => {
+                    let clicked = state == ElementState::Pressed;
+                    match button {
+                        MouseButton::Left => app_state.input.mouse.is_left_clicked = clicked,
+                        MouseButton::Right => app_state.input.mouse.is_right_clicked = clicked,
+                        _ => {}
+                    }
+                }
+                WindowEvent::CursorMoved { position, .. } => {
+                    let last_position = app_state.input.mouse.position;
+                    let current_position = glm::vec2(position.x as _, position.y as _);
+                    app_state.input.mouse.position = current_position;
+                    app_state.input.mouse.position_delta = current_position - last_position;
+                    let center = app_state.window_center();
+                    app_state.input.mouse.offset_from_center = glm::vec2(
+                        (center.x - position.x as i32) as _,
+                        (center.y - position.y as i32) as _,
+                    );
+                    cursor_moved = true;
+                }
+                WindowEvent::MouseWheel {
+                    delta: MouseScrollDelta::LineDelta(_, v_lines),
+                    ..
+                } => {
+                    app_state.input.mouse.wheel_delta = v_lines;
+                }
+                _ => {}
+            },
+            Event::MainEventsCleared => {
+                if !cursor_moved {
+                    app_state.input.mouse.position_delta = glm::vec2(0.0, 0.0);
+                }
+                cursor_moved = false;
+
+                window.request_redraw();
+            }
+            Event::RedrawRequested(_) => {
+                app.draw(&mut renderer, &app_state)
+                    .expect("Failed to draw app!");
+            }
+            Event::RedrawEventsCleared => {
+                app_state.input.mouse.wheel_delta = 0.0;
+            }
+            _ => {}
+        }
+    });
 }
 
 pub struct EnvironmentMapSet {
@@ -85,16 +218,8 @@ impl DemoApp {
             asset_geometry_buffer: None,
         }
     }
-}
 
-impl Drop for DemoApp {
-    fn drop(&mut self) {
-        self.context.logical_device().wait_idle();
-    }
-}
-
-impl App for DemoApp {
-    fn initialize(
+    pub fn initialize(
         &mut self,
         window: &mut Window,
         renderer: &mut Renderer,
@@ -223,13 +348,13 @@ impl App for DemoApp {
         Ok(())
     }
 
-    fn update(
+    pub fn update(
         &mut self,
         window: &mut Window,
         renderer: &mut Renderer,
         app_state: &AppState,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.camera.update(&app_state);
+        self.camera.update(&app_state.input, app_state.delta_time);
 
         let projection = glm::perspective_zo(
             renderer
@@ -347,7 +472,7 @@ impl App for DemoApp {
         Ok(())
     }
 
-    fn draw(
+    pub fn draw(
         &mut self,
         renderer: &mut Renderer,
         app_state: &AppState,
@@ -358,6 +483,12 @@ impl App for DemoApp {
         );
 
         Ok(())
+    }
+}
+
+impl Drop for DemoApp {
+    fn drop(&mut self) {
+        self.context.logical_device().wait_idle();
     }
 }
 
