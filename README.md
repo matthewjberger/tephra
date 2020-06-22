@@ -18,24 +18,3 @@ cargo run --bin pbr
 # Or use release mode and enable the 'validation' feature flag
 cargo run --bin pbr --release --features validation
 ```
-
-## Features
-
-- [ ] Depth of Field
-- [ ] Chromatic Aberration
-- [ ] Film Grain
-- [ ] Bloom
-- [ ] Shadow Mapping
-- [ ] Cascaded Shadow Mapping
-- [ ] Omnidirectional Shadow Mapping
-- [ ] Motion Blur
-- [ ] Deferred Rendering Pipeline
-- [ ] Forward+ Rendering Pipeline
-- [ ] Screen Space Reflections
-- [ ] Screenshots
-
-### Rendering Backends
-
-- [ ] Vulkan (default)
-- [ ] OpenGL
-- [ ] DirectX 12
